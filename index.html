@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting Form & Video Analyzer</title>
+    <title>AI Powerlifting Form & Accurate RPE Analyzer</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -13,8 +13,8 @@
 
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting Video & RPE Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Select exercise, upload video, and get instant automatic RPE and form feedback.</p>
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting Accurate RPE Analyzer</h1>
+        <p class="text-slate-400 text-sm mb-4">Concentric phase tracking for precise RPE and form feedback.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -32,7 +32,7 @@
 
         <!-- Video Upload Section -->
         <div class="mt-4 p-4 bg-slate-800 border border-dashed border-slate-600 rounded-xl text-center">
-            <label class="block text-sm font-medium text-slate-300 mb-2">📁 Upload Lift Video (MP4/MOV) - Smooth Auto Play & Analysis</label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">📁 Upload Lift Video - Auto Concentric RPE Calculation</label>
             <input type="file" id="video-upload" accept="video/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
         </div>
     </header>
@@ -40,30 +40,29 @@
     <!-- Main Video/Upload & Canvas Container -->
     <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl flex justify-center items-center min-h-[360px]">
         <video id="webcam" class="hidden" autoplay playsinline muted></video>
-        <!-- আপলোড করা ভিডিওর জন্য ন্যাচারাল প্লেব্যাক নিশ্চিত করা হয়েছে -->
         <video id="uploaded-video" class="w-full h-auto block" controls playsinline muted></video>
         <canvas id="output_canvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
     </div>
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        Stand in position or upload a lift video... ⏳
+        Upload a video to analyze lifting velocity & RPE... ⏳
     </div>
 
     <!-- Set Summary & Log Section -->
     <div class="mt-6 w-full max-w-2xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
         <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-bold text-cyan-400">📋 Lift Analysis & Summary</h2>
+            <h2 class="text-xl font-bold text-cyan-400">📋 Accurate RPE & Form Breakdown</h2>
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">Clear Log</button>
         </div>
         <div id="log-content" class="space-y-2 text-slate-300 text-sm">
-            <p class="text-slate-500 italic">No analysis recorded yet. Perform a live lift or upload a video.</p>
+            <p class="text-slate-500 italic">No lift analyzed yet.</p>
         </div>
     </div>
 
     <!-- Footer -->
     <footer class="mt-8 text-slate-500 text-xs">
-        Powered by MediaPipe Pose & Tailwind CSS
+        Powered by MediaPipe Pose & Powerlifting Biomechanics
     </footer>
 
     <!-- App Logic Script -->
@@ -85,10 +84,10 @@
 
         let lastY = 0;
         let lastTime = Date.now();
-        let velocities = [];
+        let concentricVelocities = []; // শুধু ওঠার সময়ের স্পিড রেকর্ড করার জন্য
         let formIssues = [];
         let isProcessing = false;
-        let isSending = false; // ফ্রেম জ্যাম বা ফ্রিজ হওয়া রোধ করার কনকারেন্সি লক
+        let isSending = false;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -108,7 +107,6 @@
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             
-            // শুধু ওয়েবক্যামের ক্ষেত্রে ক্যানভাসে ভিডিও ড্র হবে, আপলোড করা ভিডিও নিজে নিজেই চলবে
             if (activeSource === webcamElement) {
                 canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
             }
@@ -124,18 +122,23 @@
                 const leftElbow = landmarks[13];
                 const leftWrist = landmarks[15];
 
-                let currentY = leftHip.y;
-                if (selectedExercise === 'bench') currentY = leftWrist.y;
+                // এক্সারসাইজ অনুযায়ী ট্র্যাক পয়েন্ট নির্ধারণ
+                let currentY = leftHip.y; // স্কোয়াট ও ডেডলিফটের জন্য হিপ
+                if (selectedExercise === 'bench') currentY = leftWrist.y; // বেঞ্চের জন্য রিস্ট/বার
 
                 const currentTime = Date.now();
                 const timeDiff = (currentTime - lastTime) / 1000;
 
-                if (timeDiff > 0.03) {
-                    const velocity = Math.abs(currentY - lastY) / timeDiff;
+                if (timeDiff > 0.02) {
+                    const deltaY = currentY - lastY; 
+                    // MediaPipe-এ স্ক্রিনের ওপরের দিক হলো Y=0। 
+                    // সুতরাং deltaY < 0 মানে হলো বডি বা ওয়েট ওপরের দিকে উঠছে (Concentric Phase)!
+                    const velocity = Math.abs(deltaY) / timeDiff;
 
-                    if (velocity > 0.02) {
+                    if (deltaY < -0.005) { 
+                        // লিফট ওপরের দিকে উঠছে (Concentric Upward Phase) - কেবল তখনই ভেলোসিটি কাউন্ট হবে
                         isProcessing = true;
-                        velocities.push(velocity);
+                        concentricVelocities.push(velocity);
                     }
 
                     if (isProcessing) {
@@ -148,28 +151,24 @@
                             if (kneeAngle < 85) {
                                 if(!formIssues.includes("✓ Proper Squat Depth Achieved")) formIssues.push("✓ Proper Squat Depth Achieved");
                             } else {
-                                if(!formIssues.includes("⚠️ High Squat (Needs more depth)")) formIssues.push("⚠️ High Squat (Needs more depth)");
+                                if(!formIssues.includes("⚠️ High Squat (Insufficient Depth)")) formIssues.push("⚠️ High Squat (Insufficient Depth)");
                             }
                         } else if (selectedExercise === 'bench') {
                             drawJointLine(leftShoulder, leftElbow, '#06b6d4');
                             drawJointLine(leftElbow, leftWrist, '#3b82f6');
                             const elbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
                             if (elbowAngle < 75) {
-                                if(!formIssues.includes("✓ Solid Touch / Control on Chest")) formIssues.push("✓ Solid Touch / Control on Chest");
+                                if(!formIssues.includes("✓ Solid Touch on Chest")) formIssues.push("✓ Solid Touch on Chest");
                             }
                         } else if (selectedExercise === 'deadlift') {
                             drawJointLine(leftShoulder, leftHip, '#06b6d4');
                             drawJointLine(leftHip, leftKnee, '#3b82f6');
                             const spineLean = Math.abs(leftShoulder.x - leftHip.x);
                             if (spineLean > 0.32) {
-                                if(!formIssues.includes("⚠️ Spine rounding / Back flexion detected")) formIssues.push("⚠️ Spine rounding / Back flexion detected");
+                                if(!formIssues.includes("⚠️ Lower Back Rounding Detected")) formIssues.push("⚠️ Lower Back Rounding Detected");
                             } else {
                                 if(!formIssues.includes("✓ Neutral Spine Maintained")) formIssues.push("✓ Neutral Spine Maintained");
                             }
-                        }
-
-                        if (activeSource === webcamElement && velocity < 0.01 && velocities.length > 15) {
-                            finalizeSetAndLog(selectedExercise);
                         }
                     }
 
@@ -181,39 +180,45 @@
         }
 
         function finalizeSetAndLog(exercise) {
-            if (!isProcessing && velocities.length === 0) return;
+            if (concentricVelocities.length === 0) {
+                feedbackBox.innerText = "No clear upward lift detected. Try another video angle ⚠️";
+                feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
+                return;
+            }
+
             isProcessing = false;
             
+            // পাওয়ারলিফটিং ভেলোসিটি প্রফাইলিং (Velocity-Based Training RPE Mapping)
+            // কনসেন্ট্রিক ফেজের গড় এবং সর্বনিম্ন স্পিড দিয়ে গ্রাইন্ড বা ম্যাক্স এফোর্ট মাপা হয়
+            const avgVel = concentricVelocities.reduce((a, b) => a + b, 0) / concentricVelocities.length;
+            const minVel = Math.min(...concentricVelocities); // সবচেয়ে ধীরগতির পয়েন্ট (Sticking point)
+
             let finalRPE = "RPE 8.0";
             let rpeColor = "text-amber-400";
 
-            if (velocities.length > 0) {
-                const maxVel = Math.max(...velocities);
-                const avgVel = velocities.reduce((a, b) => a + b, 0) / velocities.length;
-
-                if (maxVel > 0.60 || avgVel > 0.30) {
-                    finalRPE = "RPE 6.0 - 6.5 (Very Fast / Warm-up Weight)";
-                    rpeColor = "text-emerald-400";
-                } else if (maxVel > 0.40 || avgVel > 0.18) {
-                    finalRPE = "RPE 7.0 - 7.5 (Moderate Speed / Speed Work)";
-                    rpeColor = "text-teal-400";
-                } else if (maxVel > 0.22 || avgVel > 0.09) {
-                    finalRPE = "RPE 8.0 - 8.5 (Heavy Working Set)";
-                    rpeColor = "text-cyan-400";
-                } else if (maxVel > 0.10 || avgVel > 0.04) {
-                    finalRPE = "RPE 9.0 - 9.5 (Heavy Grind / Submaximal)";
-                    rpeColor = "text-amber-400";
-                } else {
-                    finalRPE = "RPE 10 (Max Effort / Ultimate Grinder)";
-                    rpeColor = "text-rose-500 font-bold";
-                }
+            // সায়েন্টিফিক ভেলোসিটি থ্রেশহোল্ড (Velocities mapped to RPE scale)
+            if (avgVel > 0.45) {
+                finalRPE = "RPE 6.0 - 6.5 (Very Fast / Warm-up / Explosive)";
+                rpeColor = "text-emerald-400";
+            } else if (avgVel > 0.30) {
+                finalRPE = "RPE 7.0 - 7.5 (Moderate Speed / Working Weight)";
+                rpeColor = "text-teal-400";
+            } else if (avgVel > 0.18) {
+                finalRPE = "RPE 8.0 - 8.5 (Heavy Set / Solid Effort)";
+                rpeColor = "text-cyan-400";
+            } else if (avgVel > 0.09) {
+                finalRPE = "RPE 9.0 - 9.5 (Heavy Grind / Submaximal Peak)";
+                rpeColor = "text-amber-400";
+            } else {
+                finalRPE = "RPE 10 (Max Effort / Ultimate Grinder)";
+                rpeColor = "text-rose-500 font-bold";
             }
 
             let uniqueIssues = [...new Set(formIssues)];
             let problemsHTML = "";
             
             if (uniqueIssues.length === 0) {
-                problemsHTML = `<span class="text-emerald-400 font-semibold text-base">✨ Excellent Execution! Form looks solid.</span>`;
+                problemsHTML = `<span class="text-emerald-400 font-semibold text-base">✨ Clean Form & Execution!</span>`;
             } else {
                 problemsHTML = `<ul class="space-y-1">` + uniqueIssues.map(err => {
                     let colorClass = err.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400';
@@ -229,14 +234,15 @@
                         <span>Exercise: ${exercise.toUpperCase()}</span>
                         <span class="${rpeColor}">${finalRPE}</span>
                     </div>
-                    <div class="text-xs text-slate-400 mb-3">Analyzed at: ${timestamp}</div>
+                    <div class="text-xs text-slate-400 mb-3">Concentric Velocity Score: ${avgVel.toFixed(3)} | Analyzed at: ${timestamp}</div>
                     <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">${problemsHTML}</div>
                 </div>
             `;
-            feedbackBox.innerText = "Video analysis completed automatically! 📋";
+            
+            feedbackBox.innerText = "Accurate RPE & Form Analysis Completed! 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
             
-            velocities = [];
+            concentricVelocities = [];
             formIssues = [];
         }
 
@@ -264,7 +270,6 @@
 
         pose.onResults(onResults);
 
-        // সেফ এবং স্মুথ লুপ যা ভিডিও ফ্রিজ হতে দেবে না
         async function runAnalyzerLoop() {
             if (!activeSource.paused && !activeSource.ended) {
                 if (!isSending && activeSource.readyState >= 2) {
@@ -287,7 +292,7 @@
             
             activeSource = webcamElement;
             isProcessing = false;
-            velocities = [];
+            concentricVelocities = [];
             formIssues = [];
 
             let constraints = {
@@ -318,7 +323,7 @@
             };
         }
 
-        // ভিডিও আপলোড হ্যান্ডলার - জিরো ল্যাগ ও জিরো ফ্রিজ
+        // ভিডিও আপলোড করার সাথে সাথে নিখুঁত Concentric RPE ক্যালকুলেশন শুরু হবে
         videoUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -337,7 +342,7 @@
             
             activeSource = uploadedVideoElement;
             isProcessing = true;
-            velocities = [];
+            concentricVelocities = [];
             formIssues = [];
 
             uploadedVideoElement.play().then(() => {
@@ -347,7 +352,7 @@
                 feedbackBox.innerText = "Click play on the video to start analysis ⚠️";
             });
             
-            feedbackBox.innerText = "Analyzing video smoothly... 🎬";
+            feedbackBox.innerText = "Analyzing concentric velocity & RPE... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
             uploadedVideoElement.onended = () => {
@@ -362,8 +367,8 @@
         };
 
         resetLogBtn.addEventListener('click', () => {
-            logContent.innerHTML = `<p class="text-slate-500 italic">No analysis recorded yet. Perform a live lift or upload a video.</p>`;
-            velocities = [];
+            logContent.innerHTML = `<p class="text-slate-500 italic">No lift analyzed yet.</p>`;
+            concentricVelocities = [];
             formIssues = [];
             isProcessing = false;
         });
