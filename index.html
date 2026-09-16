@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Bar Path Tracker with RPE</title>
+    <title>AI Powerlifting & Bar Path Tracker with Accurate RPE</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -14,7 +14,7 @@
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift, Bar Path & RPE Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking, Bar Path & Final Set RPE.</p>
+        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking, Bar Path & Balanced RPE.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -63,7 +63,7 @@
 
     <!-- Footer -->
     <footer class="mt-8 text-slate-500 text-xs">
-        Powered by Biomechanics, Bar Path Tracing & Final Set RPE Algorithm
+        Powered by Biomechanics, Bar Path Tracing & Balanced RPE Algorithm
     </footer>
 
     <!-- App Logic Script -->
@@ -92,7 +92,7 @@
         let repSpeeds = [];
         let lastHipY = 0;
         let lastWristY = 0;
-        let barPathPoints = []; // বার বা হাতের মুভমেন্ট ট্র্যাক করার জন্য ট্রেইল পয়েন্ট
+        let barPathPoints = [];
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -136,16 +136,13 @@
 
                 scanFramesCount++;
 
-                // বার পাথ বা হাত/রিস্টের পজিশন ট্র্যাক করে ট্রেইলে যোগ করা
                 if (currentMode !== 'posture' && leftWrist) {
                     barPathPoints.push({ x: leftWrist.x * canvasElement.width, y: leftWrist.y * canvasElement.height });
-                    // মেমোরি বাঁচতে সর্বোচ্চ ২০০টি পয়েন্ট রাখা হবে
                     if (barPathPoints.length > 200) {
                         barPathPoints.shift();
                     }
                 }
 
-                // স্ক্রিনে বার পাথ বা ট্রেইল ড্র করা
                 drawBarPath();
 
                 if (currentMode === 'posture') {
@@ -183,7 +180,7 @@
                     
                     let speed = Math.abs(leftHip.y - lastHipY);
                     lastHipY = leftHip.y;
-                    if(speed > 0.001) repSpeeds.push(speed);
+                    if(speed > 0.0005) repSpeeds.push(speed);
 
                     let estimatedRPE = calculateInstantRPE(repSpeeds);
 
@@ -204,7 +201,7 @@
                     
                     let speed = Math.abs(leftWrist.y - lastWristY);
                     lastWristY = leftWrist.y;
-                    if(speed > 0.001) repSpeeds.push(speed);
+                    if(speed > 0.0005) repSpeeds.push(speed);
 
                     let estimatedRPE = calculateInstantRPE(repSpeeds);
 
@@ -221,7 +218,7 @@
                     
                     let speed = Math.abs(leftHip.y - lastHipY);
                     lastHipY = leftHip.y;
-                    if(speed > 0.001) repSpeeds.push(speed);
+                    if(speed > 0.0005) repSpeeds.push(speed);
 
                     let estimatedRPE = calculateInstantRPE(repSpeeds);
                     const spineLean = Math.abs(leftShoulder.x - leftHip.x);
@@ -239,25 +236,26 @@
             canvasCtx.restore();
         }
 
+        // সংশোধিত ও ব্যালান্সড RPE ক্যালকুলেশন লজিক (যাতে হালকা ওজনে ভুল করে বেশি RPE না দেখায়)
         function calculateInstantRPE(speeds) {
-            if (speeds.length < 10) return "7.0";
+            if (speeds.length < 10) return "6.0 - 6.5";
             const recentSpeeds = speeds.slice(-15);
             const avgSpeed = recentSpeeds.reduce((a, b) => a + b, 0) / recentSpeeds.length;
             
-            if (avgSpeed < 0.002) return "9.5 - 10";
-            if (avgSpeed < 0.005) return "8.5 - 9.0";
-            if (avgSpeed < 0.010) return "7.5 - 8.0";
-            return "6.5 - 7.0";
+            if (avgSpeed < 0.001) return "9.0 - 9.5";
+            if (avgSpeed < 0.003) return "8.0 - 8.5";
+            if (avgSpeed < 0.007) return "7.0 - 7.5";
+            return "6.0 - 6.5";
         }
 
         function getFinalSetRPE() {
             if (repSpeeds.length === 0) return "N/A (ডেটা পাওয়া যায়নি)";
             const overallAvgSpeed = repSpeeds.reduce((a, b) => a + b, 0) / repSpeeds.length;
             
-            if (overallAvgSpeed < 0.003) return "9.5 (খুব ভারী ও গ্রাইন্ডিং সেট)";
-            if (overallAvgSpeed < 0.006) return "8.5 - 9.0 (ভারী ও চ্যালেঞ্জিং সেট)";
-            if (overallAvgSpeed < 0.012) return "7.5 - 8.0 (দৃঢ় ও ভালো পেস)";
-            return "7.0 বা তার নিচে (সহজ ও সাবলীল সেট)";
+            if (overallAvgSpeed < 0.0015) return "9.0 - 9.5 (ভারী ও গ্রাইন্ডিং সেট)";
+            if (overallAvgSpeed < 0.004) return "8.0 - 8.5 (চ্যালেঞ্জিং সেট)";
+            if (overallAvgSpeed < 0.008) return "7.0 - 7.5 (দৃঢ় ও ভালো পেস)";
+            return "6.0 - 6.5 (সহজ ও সাবলীল ওয়ার্ম-আপ/মডারেট সেট)";
         }
 
         function addUniqueIssue(issue) {
@@ -310,7 +308,6 @@
             canvasCtx.stroke();
         }
 
-        // বার পাথ বা মুভমেন্ট ট্রেইল স্ক্রিনে আঁকার ফাংশন
         function drawBarPath() {
             if (barPathPoints.length < 2) return;
             canvasCtx.beginPath();
@@ -319,7 +316,7 @@
                 canvasCtx.lineTo(barPathPoints[i].x, barPathPoints[i].y);
             }
             canvasCtx.lineWidth = 3;
-            canvasCtx.strokeStyle = '#f59e0b'; // সোনালী/হলুদ রঙের বার পাথ ট্রেইল
+            canvasCtx.strokeStyle = '#f59e0b';
             canvasCtx.stroke();
         }
 
