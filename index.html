@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Posture Scanner with Final Set RPE</title>
+    <title>AI Powerlifting & Bar Path Tracker with RPE</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -13,8 +13,8 @@
 
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift & Final Set RPE Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking & Final Set RPE Summary.</p>
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift, Bar Path & RPE Analyzer</h1>
+        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking, Bar Path & Final Set RPE.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -53,7 +53,7 @@
     <!-- Posture & Diagnostics Summary Section -->
     <div class="mt-6 w-full max-w-2xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
         <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-bold text-cyan-400">📋 ফর্ম ও ফাইনাল সেট RPE রিপোর্ট</h2>
+            <h2 class="text-xl font-bold text-cyan-400">📋 ফর্ম, বার পাথ ও ফাইনাল RPE রিপোর্ট</h2>
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">লগ মুছুন</button>
         </div>
         <div id="log-content" class="space-y-2 text-slate-300 text-sm">
@@ -63,7 +63,7 @@
 
     <!-- Footer -->
     <footer class="mt-8 text-slate-500 text-xs">
-        Powered by Biomechanics & Final Set RPE Algorithm
+        Powered by Biomechanics, Bar Path Tracing & Final Set RPE Algorithm
     </footer>
 
     <!-- App Logic Script -->
@@ -88,10 +88,11 @@
         let isSending = false;
         let scanCompleted = false;
 
-        // RPE tracking variables
+        // RPE & Bar Path tracking variables
         let repSpeeds = [];
         let lastHipY = 0;
         let lastWristY = 0;
+        let barPathPoints = []; // বার বা হাতের মুভমেন্ট ট্র্যাক করার জন্য ট্রেইল পয়েন্ট
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -134,6 +135,18 @@
                 const leftElbow = landmarks[13];
 
                 scanFramesCount++;
+
+                // বার পাথ বা হাত/রিস্টের পজিশন ট্র্যাক করে ট্রেইলে যোগ করা
+                if (currentMode !== 'posture' && leftWrist) {
+                    barPathPoints.push({ x: leftWrist.x * canvasElement.width, y: leftWrist.y * canvasElement.height });
+                    // মেমোরি বাঁচতে সর্বোচ্চ ২০০টি পয়েন্ট রাখা হবে
+                    if (barPathPoints.length > 200) {
+                        barPathPoints.shift();
+                    }
+                }
+
+                // স্ক্রিনে বার পাথ বা ট্রেইল ড্র করা
+                drawBarPath();
 
                 if (currentMode === 'posture') {
                     const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
@@ -219,7 +232,7 @@
                         addUniqueIssue("✓ মেরুদণ্ড স্বাভাবিক বা নিউট্রাল রয়েছে");
                     }
 
-                    feedbackBox.innerText = `⚡ ডেডলিফ্ট মোড | স্পাইন ট্র্যাকিং সচল | বর্তমান RPE: ${estimatedRPE}`;
+                    feedbackBox.innerText = `⚡ ডেডলিফ্ট মোড | স্পাইন ও বার পাথ ট্র্যাকিং সচল | বর্তমান RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
                 }
             }
@@ -237,7 +250,6 @@
             return "6.5 - 7.0";
         }
 
-        // পুরো সেট বা ভিডিও শেষে সামগ্রিক RPE বের করার ফাংশন
         function getFinalSetRPE() {
             if (repSpeeds.length === 0) return "N/A (ডেটা পাওয়া যায়নি)";
             const overallAvgSpeed = repSpeeds.reduce((a, b) => a + b, 0) / repSpeeds.length;
@@ -298,6 +310,19 @@
             canvasCtx.stroke();
         }
 
+        // বার পাথ বা মুভমেন্ট ট্রেইল স্ক্রিনে আঁকার ফাংশন
+        function drawBarPath() {
+            if (barPathPoints.length < 2) return;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(barPathPoints[0].x, barPathPoints[0].y);
+            for (let i = 1; i < barPathPoints.length; i++) {
+                canvasCtx.lineTo(barPathPoints[i].x, barPathPoints[i].y);
+            }
+            canvasCtx.lineWidth = 3;
+            canvasCtx.strokeStyle = '#f59e0b'; // সোনালী/হলুদ রঙের বার পাথ ট্রেইল
+            canvasCtx.stroke();
+        }
+
         const pose = new Pose({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
@@ -336,6 +361,7 @@
             scanFramesCount = 0;
             detectedIssues = [];
             repSpeeds = [];
+            barPathPoints = [];
             scanCompleted = false;
 
             let constraints = {
@@ -386,6 +412,7 @@
             scanFramesCount = 0;
             detectedIssues = [];
             repSpeeds = [];
+            barPathPoints = [];
             scanCompleted = false;
 
             uploadedVideoElement.play().then(() => {
@@ -395,10 +422,9 @@
                 feedbackBox.innerText = "ভিডিও চালু করতে প্লে বাটনে ক্লিক করুন ⚠️";
             });
             
-            feedbackBox.innerText = "ভিডিওর লিফট ও ফাইনাল সেট RPE হিসাব করা হচ্ছে... 🎬";
+            feedbackBox.innerText = "ভিডিওর বার পাথ ও ফাইনাল RPE হিসাব করা হচ্ছে... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
-            // ভিডিও শেষ হলে পুরো সেটের RPE সহ লগ ফাইনাল হবে
             uploadedVideoElement.onended = () => {
                 finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
             };
@@ -414,6 +440,7 @@
             detectedIssues = [];
             scanFramesCount = 0;
             repSpeeds = [];
+            barPathPoints = [];
             scanCompleted = false;
         });
 
@@ -421,6 +448,7 @@
             detectedIssues = [];
             scanFramesCount = 0;
             repSpeeds = [];
+            barPathPoints = [];
             scanCompleted = false;
         });
 
