@@ -36,7 +36,7 @@
     </header>
 
     <!-- Main Video & Canvas Container -->
-    <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
+    <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl flex justify-center items-center min-h-[360px]">
         <video id="webcam" class="hidden" autoplay playsinline></video>
         <canvas id="output_canvas" class="w-full h-auto block"></canvas>
     </div>
@@ -61,7 +61,7 @@
         const rpeBadge = document.getElementById('rpe-badge');
         const toggleCameraBtn = document.getElementById('toggle-camera');
 
-        let useFrontCamera = true; // ডিফল্ট ক্যামেরা স্টেট
+        let useFrontCamera = false; // প্রথমে ব্যাক ক্যামেরা ট্রাই করার জন্য false রাখা হলো
         let currentStream = null;
         let lastY = 0;
         let lastTime = Date.now();
@@ -77,6 +77,8 @@
         }
 
         function onResults(results) {
+            if (!results.image) return;
+
             if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
                 canvasElement.width = videoElement.videoWidth || 640;
                 canvasElement.height = videoElement.videoHeight || 480;
@@ -205,21 +207,21 @@
             modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
-            minDetectionConfidence: 0.6,
-            minTrackingConfidence: 0.6
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
         pose.onResults(onResults);
 
-        // Custom Camera Stream Function with Back/Front Camera Switch Support
+        // Robust Camera Start Function with Fallback
         async function startCamera() {
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
             }
 
-            const constraints = {
+            let constraints = {
                 video: {
-                    facingMode: useFrontCamera ? "user" : "environment", // "environment" মানে পেছনের ক্যামেরা
+                    facingMode: useFrontCamera ? "user" : { exact: "environment" },
                     width: { ideal: 640 },
                     height: { ideal: 480 }
                 }
@@ -227,23 +229,33 @@
 
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = currentStream;
-                await videoElement.play();
-
-                // Frame processing loop
-                async function processVideoFrame() {
-                    if (!videoElement.paused && !videoElement.ended) {
-                        await pose.send({ image: videoElement });
-                        requestAnimationFrame(processVideoFrame);
-                    }
-                }
-                processVideoFrame();
-
             } catch (err) {
-                console.error("Camera access error:", err);
-                feedbackBox.innerText = "Camera access denied or unavailable. Please allow permissions.";
-                feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-rose-950/80 border border-rose-500 rounded-xl text-center text-xl font-semibold text-rose-400 shadow-lg";
+                // যদি ব্যাক ক্যামেরা (exact environment) ডিভাইস সমর্থন না করে, তবে সাধারণ ক্যামেরা রিকোয়েস্ট করবে
+                console.warn("Environment camera failed, switching to default camera...", err);
+                try {
+                    constraints = { video: { width: { ideal: 640 }, height: { ideal: 480 } } };
+                    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (e) {
+                    console.error("Camera access totally failed:", e);
+                    feedbackBox.innerText = "Camera access denied or unavailable. Please check browser permissions.";
+                    feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-rose-950/80 border border-rose-500 rounded-xl text-center text-xl font-semibold text-rose-400 shadow-lg";
+                    return;
+                }
             }
+
+            videoElement.srcObject = currentStream;
+            
+            videoElement.onloadedmetadata = () => {
+                videoElement.play().then(() => {
+                    async function processVideoFrame() {
+                        if (!videoElement.paused && !videoElement.ended) {
+                            await pose.send({ image: videoElement });
+                            requestAnimationFrame(processVideoFrame);
+                        }
+                    }
+                    processVideoFrame();
+                }).catch(e => console.error("Video play error:", e));
+            };
         }
 
         // Switch Camera Button Event
