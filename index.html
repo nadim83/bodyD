@@ -46,7 +46,7 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        Position yourself in front of camera or upload a video... ⏳
+        Position yourself clearly in front of the laptop camera... ⏳
     </div>
 
     <!-- Set Summary & Log Section -->
@@ -129,18 +129,19 @@
                 const currentTime = Date.now();
                 const timeDiff = (currentTime - lastTime) / 1000;
 
-                if (timeDiff > 0.02) {
+                if (timeDiff > 0.015) {
                     const deltaY = currentY - lastY; 
                     const velocity = Math.abs(deltaY) / timeDiff;
 
-                    if (deltaY < -0.004) { 
-                        // Concentric Upward Phase
+                    // ল্যাপটপ ক্যামেরার সেন্সিভিটি একটু বাড়িয়ে দেওয়া হলো যাতে হালকা মুভমেন্টও ট্র্যাক করতে পারে
+                    if (deltaY < -0.002) { 
                         isProcessing = true;
                         liveStationaryCount = 0;
                         concentricVelocities.push(velocity);
-                    } else if (isProcessing && velocity < 0.012) {
+                    } else if (isProcessing && velocity < 0.015) {
                         liveStationaryCount++;
-                        if (activeSource === webcamElement && liveStationaryCount > 40 && concentricVelocities.length > 10) {
+                        // লাইভ ক্যামেরার ক্ষেত্রে সেট শেষ করে স্থির হলে দ্রুত RPE দেখাবে
+                        if (activeSource === webcamElement && liveStationaryCount > 30 && concentricVelocities.length > 5) {
                             finalizeSetAndLog(selectedExercise);
                         }
                     }
@@ -181,13 +182,13 @@
                 }
 
                 if (!isProcessing && activeSource === webcamElement) {
-                    feedbackBox.innerText = "Ready. Perform your " + selectedExercise.toUpperCase() + " set in front of camera 🔽";
+                    feedbackBox.innerText = "Camera Active. Perform your " + selectedExercise.toUpperCase() + " set 🔽";
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
                 }
 
             } else {
                 if (!isProcessing && activeSource === webcamElement) {
-                    feedbackBox.innerText = "Position yourself clearly in camera frame ⚠️";
+                    feedbackBox.innerText = "Step back so your full body is visible in the camera ⚠️";
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
                 }
             }
@@ -247,7 +248,7 @@
                 </div>
             `;
             
-            feedbackBox.innerText = "Set Analysis Completed Successfully! 🎯";
+            feedbackBox.innerText = "Live Set RPE Analyzed Successfully! 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
             
             concentricVelocities = [];
@@ -306,7 +307,7 @@
 
             let constraints = {
                 video: {
-                    facingMode: useFrontCamera ? "user" : { exact: "environment" },
+                    facingMode: useFrontCamera ? "user" : "environment",
                     width: { ideal: 640 },
                     height: { ideal: 480 }
                 }
@@ -340,7 +341,7 @@
                 currentStream.getTracks().forEach(track => track.stop());
             }
 
-            const videoUrl = URL.createObjectURL(file);
+            const videoUrl = URL.createObjectURL.createObjectURL ? URL.createObjectURL(file) : URL.createObjectURL(file);
             
             webcamElement.classList.add('hidden');
             uploadedVideoElement.classList.remove('hidden');
