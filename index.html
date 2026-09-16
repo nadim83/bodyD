@@ -14,7 +14,7 @@
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting Video & RPE Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Only tracks actual lifts (Squat, Bench, Deadlift) and ignores casual movements.</p>
+        <p class="text-slate-400 text-sm mb-4">Select your exercise and perform the exact lift. Casual movements are strictly ignored.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -46,7 +46,7 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        Stand in position. Waiting for lift to start... ⏳
+        Stand in position. Waiting for lift... ⏳
     </div>
 
     <!-- Set Summary & Log Section -->
@@ -82,7 +82,8 @@
         let currentStream = null;
         let activeSource = webcamElement;
 
-        let lastY = 0;
+        let startY = null;
+        let lastY = null;
         let lastTime = Date.now();
         let speedsList = [];
         let formIssues = [];
@@ -118,25 +119,37 @@
                 const leftElbow = landmarks[13];
                 const leftWrist = landmarks[15];
 
+                // এক্সারসাইজ অনুযায়ী ট্র্যাকিং পয়েন্ট নির্ধারণ
+                let currentY = leftHip.y; // স্কোয়াট বা ডেডলিফটের জন্য হিপ
+                if (selectedExercise === 'bench') currentY = leftWrist.y; // বেঞ্চের জন্য রিস্ট/হাত
+
+                if (startY === null) startY = currentY;
+
                 const currentTime = Date.now();
                 const timeDiff = (currentTime - lastTime) / 1000;
-                
-                let currentY = leftHip.y;
-                if (selectedExercise === 'bench') currentY = leftWrist.y;
 
-                if (timeDiff > 0.05) {
+                if (timeDiff > 0.04) {
+                    const movementDelta = currentY - startY; // শুরুর পজিশন থেকে কতটুকু নিচে নামল
                     const speed = Math.abs(currentY - lastY) / timeDiff;
-                    
-                    // ট্রিগার কন্ডিশন: সাধারণ নড়াচড়া ইগনোর করতে স্পিড নির্দিষ্ট সীমার (0.12) বেশি হতে হবে তবেই লিফট শুরু ধরবে
-                    if (!isLiftActive && speed > 0.12) {
-                        isLiftActive = true;
-                        speedsList = [];
-                        formIssues = [];
-                        feedbackBox.innerText = "Lift started! Analyzing movement... 🔥";
-                        feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
+
+                    // কঠোর ট্রিগার ফিল্টার: 
+                    // স্কোয়াট/ডেডলিফটের ক্ষেত্রে হিপ অন্তত ১৫% নিচে নামতে হবে, অথবা বেঞ্চের ক্ষেত্রে হাত নামতে হবে তবেই লিফট শুরু বলে গণ্য হবে।
+                    if (!isLiftActive) {
+                        let triggerCondition = false;
+                        if (selectedExercise === 'squat' && movementDelta > 0.12 && speed > 0.08) triggerCondition = true;
+                        if (selectedExercise === 'bench' && Math.abs(movementDelta) > 0.10 && speed > 0.08) triggerCondition = true;
+                        if (selectedExercise === 'deadlift' && movementDelta < -0.10 && speed > 0.08) triggerCondition = true;
+
+                        if (triggerCondition) {
+                            isLiftActive = true;
+                            speedsList = [];
+                            formIssues = [];
+                            feedbackBox.innerText = "Lift started! Analyzing movement... 🔥";
+                            feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
+                        }
                     }
 
-                    // যদি লিফট একটিভ থাকে তবেই ডেটা ও ফর্ম ইস্যু কালেক্ট করবে
+                    // লিফট চলাকালীন ট্র্যাকিং ও এনালাইসিস
                     if (isLiftActive) {
                         speedsList.push(speed);
 
@@ -161,9 +174,10 @@
                             }
                         }
 
-                        // লিফট শেষ হওয়ার শর্ত (মুভমেন্ট থেমে গেলে বা লকআউটে আসলে)
-                        if (speed < 0.015 && speedsList.length > 12) {
+                        // লিফট শেষ হওয়ার শর্ত (সেট শেষ করে র্যাকে রাখা বা দাঁড়িয়ে যাওয়া)
+                        if (speed < 0.012 && speedsList.length > 15) {
                             finalizeSetAndLog(selectedExercise);
+                            startY = null; // রিসেট
                         }
                     }
 
@@ -234,8 +248,8 @@
             modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
         });
 
         pose.onResults(onResults);
@@ -253,6 +267,7 @@
             
             activeSource = webcamElement;
             isLiftActive = false;
+            startY = null;
 
             let constraints = {
                 video: {
@@ -277,9 +292,16 @@
             webcamElement.srcObject = currentStream;
             webcamElement.onloadedmetadata = () => {
                 webcamElement.play().then(() => {
-                    processSourceFrame();
+                    processSourceFileFrame();
                 });
             };
+        }
+
+        async function processSourceFileFrame() {
+            if (!activeSource.paused && !activeSource.ended) {
+                await pose.send({ image: activeSource });
+                requestAnimationFrame(processSourceFileFrame);
+            }
         }
 
         videoUploadInput.addEventListener('change', (event) => {
@@ -295,10 +317,11 @@
             
             activeSource = uploadedVideoElement;
             isLiftActive = false;
+            startY = null;
             uploadedVideoElement.play();
             
             feedbackBox.innerText = "Video loaded. Waiting for lift start... 🎬";
-            processSourceFrame();
+            processSourceFileFrame();
         });
 
         toggleCameraBtn.addEventListener('click', () => {
@@ -311,6 +334,7 @@
             speedsList = [];
             formIssues = [];
             isLiftActive = false;
+            startY = null;
         });
 
         startCamera();
