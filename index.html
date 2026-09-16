@@ -46,7 +46,7 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        Upload a video to analyze lifting velocity & RPE... ⏳
+        Position yourself in front of camera or upload a video... ⏳
     </div>
 
     <!-- Set Summary & Log Section -->
@@ -84,10 +84,11 @@
 
         let lastY = 0;
         let lastTime = Date.now();
-        let concentricVelocities = []; // শুধু ওঠার সময়ের স্পিড রেকর্ড করার জন্য
+        let concentricVelocities = [];
         let formIssues = [];
         let isProcessing = false;
         let isSending = false;
+        let liveStationaryCount = 0;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -122,23 +123,26 @@
                 const leftElbow = landmarks[13];
                 const leftWrist = landmarks[15];
 
-                // এক্সারসাইজ অনুযায়ী ট্র্যাক পয়েন্ট নির্ধারণ
-                let currentY = leftHip.y; // স্কোয়াট ও ডেডলিফটের জন্য হিপ
-                if (selectedExercise === 'bench') currentY = leftWrist.y; // বেঞ্চের জন্য রিস্ট/বার
+                let currentY = leftHip.y;
+                if (selectedExercise === 'bench') currentY = leftWrist.y;
 
                 const currentTime = Date.now();
                 const timeDiff = (currentTime - lastTime) / 1000;
 
                 if (timeDiff > 0.02) {
                     const deltaY = currentY - lastY; 
-                    // MediaPipe-এ স্ক্রিনের ওপরের দিক হলো Y=0। 
-                    // সুতরাং deltaY < 0 মানে হলো বডি বা ওয়েট ওপরের দিকে উঠছে (Concentric Phase)!
                     const velocity = Math.abs(deltaY) / timeDiff;
 
-                    if (deltaY < -0.005) { 
-                        // লিফট ওপরের দিকে উঠছে (Concentric Upward Phase) - কেবল তখনই ভেলোসিটি কাউন্ট হবে
+                    if (deltaY < -0.004) { 
+                        // Concentric Upward Phase
                         isProcessing = true;
+                        liveStationaryCount = 0;
                         concentricVelocities.push(velocity);
+                    } else if (isProcessing && velocity < 0.012) {
+                        liveStationaryCount++;
+                        if (activeSource === webcamElement && liveStationaryCount > 40 && concentricVelocities.length > 10) {
+                            finalizeSetAndLog(selectedExercise);
+                        }
                     }
 
                     if (isProcessing) {
@@ -175,30 +179,34 @@
                     lastY = currentY;
                     lastTime = currentTime;
                 }
+
+                if (!isProcessing && activeSource === webcamElement) {
+                    feedbackBox.innerText = "Ready. Perform your " + selectedExercise.toUpperCase() + " set in front of camera 🔽";
+                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
+                }
+
+            } else {
+                if (!isProcessing && activeSource === webcamElement) {
+                    feedbackBox.innerText = "Position yourself clearly in camera frame ⚠️";
+                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
+                }
             }
             canvasCtx.restore();
         }
 
         function finalizeSetAndLog(exercise) {
-            if (concentricVelocities.length === 0) {
-                feedbackBox.innerText = "No clear upward lift detected. Try another video angle ⚠️";
-                feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
-                return;
-            }
+            if (concentricVelocities.length === 0) return;
 
             isProcessing = false;
+            liveStationaryCount = 0;
             
-            // পাওয়ারলিফটিং ভেলোসিটি প্রফাইলিং (Velocity-Based Training RPE Mapping)
-            // কনসেন্ট্রিক ফেজের গড় এবং সর্বনিম্ন স্পিড দিয়ে গ্রাইন্ড বা ম্যাক্স এফোর্ট মাপা হয়
             const avgVel = concentricVelocities.reduce((a, b) => a + b, 0) / concentricVelocities.length;
-            const minVel = Math.min(...concentricVelocities); // সবচেয়ে ধীরগতির পয়েন্ট (Sticking point)
 
             let finalRPE = "RPE 8.0";
             let rpeColor = "text-amber-400";
 
-            // সায়েন্টিফিক ভেলোসিটি থ্রেশহোল্ড (Velocities mapped to RPE scale)
             if (avgVel > 0.45) {
-                finalRPE = "RPE 6.0 - 6.5 (Very Fast / Warm-up / Explosive)";
+                finalRPE = "RPE 6.0 - 6.5 (Very Fast / Warm-up)";
                 rpeColor = "text-emerald-400";
             } else if (avgVel > 0.30) {
                 finalRPE = "RPE 7.0 - 7.5 (Moderate Speed / Working Weight)";
@@ -207,7 +215,7 @@
                 finalRPE = "RPE 8.0 - 8.5 (Heavy Set / Solid Effort)";
                 rpeColor = "text-cyan-400";
             } else if (avgVel > 0.09) {
-                finalRPE = "RPE 9.0 - 9.5 (Heavy Grind / Submaximal Peak)";
+                finalRPE = "RPE 9.0 - 9.5 (Heavy Grind / Submaximal)";
                 rpeColor = "text-amber-400";
             } else {
                 finalRPE = "RPE 10 (Max Effort / Ultimate Grinder)";
@@ -239,7 +247,7 @@
                 </div>
             `;
             
-            feedbackBox.innerText = "Accurate RPE & Form Analysis Completed! 🎯";
+            feedbackBox.innerText = "Set Analysis Completed Successfully! 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
             
             concentricVelocities = [];
@@ -294,6 +302,7 @@
             isProcessing = false;
             concentricVelocities = [];
             formIssues = [];
+            liveStationaryCount = 0;
 
             let constraints = {
                 video: {
@@ -323,7 +332,6 @@
             };
         }
 
-        // ভিডিও আপলোড করার সাথে সাথে নিখুঁত Concentric RPE ক্যালকুলেশন শুরু হবে
         videoUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -352,7 +360,7 @@
                 feedbackBox.innerText = "Click play on the video to start analysis ⚠️";
             });
             
-            feedbackBox.innerText = "Analyzing concentric velocity & RPE... 🎬";
+            feedbackBox.innerText = "Analyzing uploaded video... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
             uploadedVideoElement.onended = () => {
@@ -371,6 +379,7 @@
             concentricVelocities = [];
             formIssues = [];
             isProcessing = false;
+            liveStationaryCount = 0;
         });
 
         startCamera();
