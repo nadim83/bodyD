@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Posture Scanner with Auto RPE</title>
+    <title>AI Powerlifting & Posture Scanner with Final Set RPE</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -13,8 +13,8 @@
 
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift & Posture Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking & Estimated RPE.</p>
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift & Final Set RPE Analyzer</h1>
+        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking & Final Set RPE Summary.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -53,7 +53,7 @@
     <!-- Posture & Diagnostics Summary Section -->
     <div class="mt-6 w-full max-w-2xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
         <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-bold text-cyan-400">📋 ফর্ম ও RPE ডায়াগনস্টিক রিপোর্ট</h2>
+            <h2 class="text-xl font-bold text-cyan-400">📋 ফর্ম ও ফাইনাল সেট RPE রিপোর্ট</h2>
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">লগ মুছুন</button>
         </div>
         <div id="log-content" class="space-y-2 text-slate-300 text-sm">
@@ -63,7 +63,7 @@
 
     <!-- Footer -->
     <footer class="mt-8 text-slate-500 text-xs">
-        Powered by Biomechanics & Bar Velocity RPE Estimation
+        Powered by Biomechanics & Final Set RPE Algorithm
     </footer>
 
     <!-- App Logic Script -->
@@ -92,8 +92,6 @@
         let repSpeeds = [];
         let lastHipY = 0;
         let lastWristY = 0;
-        let movementDirection = 'down';
-        let repCount = 0;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -170,12 +168,11 @@
                     
                     const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
                     
-                    // Track rep speed for RPE calculation based on hip Y movement
                     let speed = Math.abs(leftHip.y - lastHipY);
                     lastHipY = leftHip.y;
-                    repSpeeds.push(speed);
+                    if(speed > 0.001) repSpeeds.push(speed);
 
-                    let estimatedRPE = estimateRPE(repSpeeds);
+                    let estimatedRPE = calculateInstantRPE(repSpeeds);
 
                     if (kneeAngle < 85) {
                         addUniqueIssue("✓ সঠিক স্কোয়াট ডেপথ বা গভীরতা অর্জিত হয়েছে");
@@ -183,7 +180,7 @@
                         addUniqueIssue("⚠️ স্কোয়াটের গভীরতা কম হয়েছে (উঁচু স্কোয়াট)");
                     }
 
-                    feedbackBox.innerText = `🏋️ স্কোয়াট মোড | হাঁটু কোণ: ${Math.round(kneeAngle)}° | আনুমানিক RPE: ${estimatedRPE}`;
+                    feedbackBox.innerText = `🏋️ স্কোয়াট মোড | হাঁটু কোণ: ${Math.round(kneeAngle)}° | বর্তমান RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
                 } else if (currentMode === 'bench') {
@@ -194,15 +191,15 @@
                     
                     let speed = Math.abs(leftWrist.y - lastWristY);
                     lastWristY = leftWrist.y;
-                    repSpeeds.push(speed);
+                    if(speed > 0.001) repSpeeds.push(speed);
 
-                    let estimatedRPE = estimateRPE(repSpeeds);
+                    let estimatedRPE = calculateInstantRPE(repSpeeds);
 
                     if (elbowAngle < 75) {
                         addUniqueIssue("✓ বুকে সঠিকভাবে বার স্পর্শ করেছে");
                     }
 
-                    feedbackBox.innerText = `🦾 বেঞ্চ প্রেস মোড | কনুই কোণ: ${Math.round(elbowAngle)}° | আনুমানিক RPE: ${estimatedRPE}`;
+                    feedbackBox.innerText = `🦾 বেঞ্চ প্রেস মোড | কনুই কোণ: ${Math.round(elbowAngle)}° | বর্তমান RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
                 } else if (currentMode === 'deadlift') {
@@ -211,9 +208,9 @@
                     
                     let speed = Math.abs(leftHip.y - lastHipY);
                     lastHipY = leftHip.y;
-                    repSpeeds.push(speed);
+                    if(speed > 0.001) repSpeeds.push(speed);
 
-                    let estimatedRPE = estimateRPE(repSpeeds);
+                    let estimatedRPE = calculateInstantRPE(repSpeeds);
                     const spineLean = Math.abs(leftShoulder.x - leftHip.x);
 
                     if (spineLean > 0.35) {
@@ -222,24 +219,33 @@
                         addUniqueIssue("✓ মেরুদণ্ড স্বাভাবিক বা নিউট্রাল রয়েছে");
                     }
 
-                    feedbackBox.innerText = `⚡ ডেডলিফ্ট মোড | স্পাইন ট্র্যাকিং সচল | আনুমানিক RPE: ${estimatedRPE}`;
+                    feedbackBox.innerText = `⚡ ডেডলিফ্ট মোড | স্পাইন ট্র্যাকিং সচল | বর্তমান RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
                 }
             }
             canvasCtx.restore();
         }
 
-        function estimateRPE(speeds) {
-            if (speeds.length < 10) return "8.0 (শুরু হচ্ছে)";
-            // Average the last few frames to gauge movement velocity drop (Grind factor)
+        function calculateInstantRPE(speeds) {
+            if (speeds.length < 10) return "7.0";
             const recentSpeeds = speeds.slice(-15);
             const avgSpeed = recentSpeeds.reduce((a, b) => a + b, 0) / recentSpeeds.length;
             
-            // Lower speed/stalling during lift indicates higher RPE (closer to failure)
-            if (avgSpeed < 0.002) return "9.5 - 10 (অতিরিক্ত কষ্ট/Grind)";
-            if (avgSpeed < 0.005) return "8.5 - 9.0 (ভারী এফোর্ট)";
-            if (avgSpeed < 0.010) return "7.5 - 8.0 (দৃঢ় গতি)";
-            return "6.5 - 7.0 (সহজ ও সাবলীল)";
+            if (avgSpeed < 0.002) return "9.5 - 10";
+            if (avgSpeed < 0.005) return "8.5 - 9.0";
+            if (avgSpeed < 0.010) return "7.5 - 8.0";
+            return "6.5 - 7.0";
+        }
+
+        // পুরো সেট বা ভিডিও শেষে সামগ্রিক RPE বের করার ফাংশন
+        function getFinalSetRPE() {
+            if (repSpeeds.length === 0) return "N/A (ডেটা পাওয়া যায়নি)";
+            const overallAvgSpeed = repSpeeds.reduce((a, b) => a + b, 0) / repSpeeds.length;
+            
+            if (overallAvgSpeed < 0.003) return "9.5 (খুব ভারী ও গ্রাইন্ডিং সেট)";
+            if (overallAvgSpeed < 0.006) return "8.5 - 9.0 (ভারী ও চ্যালেঞ্জিং সেট)";
+            if (overallAvgSpeed < 0.012) return "7.5 - 8.0 (দৃঢ় ও ভালো পেস)";
+            return "7.0 বা তার নিচে (সহজ ও সাবলীল সেট)";
         }
 
         function addUniqueIssue(issue) {
@@ -251,6 +257,7 @@
         function finalizeLog(modeName) {
             let uniqueIssues = [...new Set(detectedIssues)];
             let problemsHTML = "";
+            let finalRPE = getFinalSetRPE();
             
             if (uniqueIssues.length === 0) {
                 problemsHTML = `<span class="text-emerald-400 font-semibold text-base">✨ চমৎকার ফর্ম! বড় কোনো ভুল পাওয়া যায়নি।</span>`;
@@ -269,12 +276,15 @@
                         <span>বিশ্লেষণের ধরন: ${modeName}</span>
                         <span class="text-emerald-400">সম্পন্ন</span>
                     </div>
-                    <div class="text-xs text-slate-400 mb-3">সময়: ${timestamp}</div>
+                    <div class="text-xs text-slate-400 mb-2">সময়: ${timestamp}</div>
+                    <div class="mb-3 p-2 bg-cyan-950/50 border border-cyan-800 rounded-lg text-cyan-200 font-semibold text-sm">
+                        🔥 পুরো সেটের আনুমানিক RPE (Final Set RPE): <span class="text-amber-400">${finalRPE}</span>
+                    </div>
                     <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">${problemsHTML}</div>
                 </div>
             `;
             
-            feedbackBox.innerText = "বিশ্লেষণ সম্পন্ন হয়েছে! নিচের লগ দেখুন 🎯";
+            feedbackBox.innerText = "সেট বিশ্লেষণ সম্পন্ন হয়েছে! নিচের রিপোর্টে ফাইনাল RPE দেখুন 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
         }
 
@@ -385,9 +395,10 @@
                 feedbackBox.innerText = "ভিডিও চালু করতে প্লে বাটনে ক্লিক করুন ⚠️";
             });
             
-            feedbackBox.innerText = "ভিডিওর লিফট ও RPE বিশ্লেষণ করা হচ্ছে... 🎬";
+            feedbackBox.innerText = "ভিডিওর লিফট ও ফাইনাল সেট RPE হিসাব করা হচ্ছে... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
+            // ভিডিও শেষ হলে পুরো সেটের RPE সহ লগ ফাইনাল হবে
             uploadedVideoElement.onended = () => {
                 finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
             };
