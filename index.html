@@ -14,7 +14,7 @@
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting Video & RPE Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Use live camera or upload your lift video for instant analysis.</p>
+        <p class="text-slate-400 text-sm mb-4">Only tracks actual lifts (Squat, Bench, Deadlift) and ignores casual movements.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -37,7 +37,7 @@
         </div>
     </header>
 
-    <!-- Main Video/Upload & Canvas Container (হিডেন এলিমেন্টগুলো সেফলি লুকানো) -->
+    <!-- Main Video/Upload & Canvas Container -->
     <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl flex justify-center items-center min-h-[360px]">
         <video id="webcam" class="hidden" autoplay playsinline muted></video>
         <video id="uploaded-video" class="hidden" playsinline muted></video>
@@ -46,7 +46,7 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        Get into position or upload a video to start...
+        Stand in position. Waiting for lift to start... ⏳
     </div>
 
     <!-- Set Summary & Log Section -->
@@ -56,7 +56,7 @@
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">Clear Log</button>
         </div>
         <div id="log-content" class="space-y-2 text-slate-300 text-sm">
-            <p class="text-slate-500 italic">No analysis recorded yet. Complete a live set or upload a video.</p>
+            <p class="text-slate-500 italic">No analysis recorded yet. Perform a lift to see results.</p>
         </div>
     </div>
 
@@ -87,7 +87,6 @@
         let speedsList = [];
         let formIssues = [];
         let isLiftActive = false;
-        let isProcessing = false;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -121,50 +120,67 @@
 
                 const currentTime = Date.now();
                 const timeDiff = (currentTime - lastTime) / 1000;
+                
                 let currentY = leftHip.y;
                 if (selectedExercise === 'bench') currentY = leftWrist.y;
 
                 if (timeDiff > 0.05) {
                     const speed = Math.abs(currentY - lastY) / timeDiff;
                     
-                    if (speed > 0.05) {
+                    // ট্রিগার কন্ডিশন: সাধারণ নড়াচড়া ইগনোর করতে স্পিড নির্দিষ্ট সীমার (0.12) বেশি হতে হবে তবেই লিফট শুরু ধরবে
+                    if (!isLiftActive && speed > 0.12) {
                         isLiftActive = true;
+                        speedsList = [];
+                        formIssues = [];
+                        feedbackBox.innerText = "Lift started! Analyzing movement... 🔥";
+                        feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
+                    }
+
+                    // যদি লিফট একটিভ থাকে তবেই ডেটা ও ফর্ম ইস্যু কালেক্ট করবে
+                    if (isLiftActive) {
                         speedsList.push(speed);
-                    }
 
-                    if (selectedExercise === 'squat') {
-                        drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                        drawJointLine(leftHip, leftKnee, '#3b82f6');
-                        drawJointLine(leftKnee, leftAnkle, '#3b82f6');
-                        const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
-                        
-                        if (kneeAngle < 75 && !formIssues.includes("Deep squat depth (Watch lower back wink)")) {
-                            formIssues.push("Deep squat depth (Watch lower back wink)");
+                        if (selectedExercise === 'squat') {
+                            drawJointLine(leftShoulder, leftHip, '#06b6d4');
+                            drawJointLine(leftHip, leftKnee, '#3b82f6');
+                            drawJointLine(leftKnee, leftAnkle, '#3b82f6');
+                            const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+                            
+                            if (kneeAngle < 75 && !formIssues.includes("Deep squat depth (Watch lower back wink)")) {
+                                formIssues.push("Deep squat depth (Watch lower back wink)");
+                            }
+                        } else if (selectedExercise === 'bench') {
+                            drawJointLine(leftShoulder, leftElbow, '#06b6d4');
+                            drawJointLine(leftElbow, leftWrist, '#3b82f6');
+                        } else if (selectedExercise === 'deadlift') {
+                            drawJointLine(leftShoulder, leftHip, '#06b6d4');
+                            drawJointLine(leftHip, leftKnee, '#3b82f6');
+                            const torsoLean = Math.abs(leftShoulder.x - leftHip.x);
+                            if (torsoLean > 0.28 && !formIssues.includes("Spine rounding / back flexion detected")) {
+                                formIssues.push("Spine rounding / back flexion detected");
+                            }
                         }
-                    } else if (selectedExercise === 'bench') {
-                        drawJointLine(leftShoulder, leftElbow, '#06b6d4');
-                        drawJointLine(leftElbow, leftWrist, '#3b82f6');
-                    } else if (selectedExercise === 'deadlift') {
-                        drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                        drawJointLine(leftHip, leftKnee, '#3b82f6');
-                        const torsoLean = Math.abs(leftShoulder.x - leftHip.x);
-                        if (torsoLean > 0.28 && !formIssues.includes("Spine rounding / back flexion detected")) {
-                            formIssues.push("Spine rounding / back flexion detected");
-                        }
-                    }
 
-                    if (isLiftActive && speed < 0.01 && speedsList.length > 10) {
-                        finalizeSetAndLog(selectedExercise);
+                        // লিফট শেষ হওয়ার শর্ত (মুভমেন্ট থেমে গেলে বা লকআউটে আসলে)
+                        if (speed < 0.015 && speedsList.length > 12) {
+                            finalizeSetAndLog(selectedExercise);
+                        }
                     }
 
                     lastY = currentY;
                     lastTime = currentTime;
                 }
 
-                feedbackBox.innerText = isLiftActive ? "Analyzing lift in progress... 🔥" : "Ready. Execute your lift 🔽";
+                if (!isLiftActive) {
+                    feedbackBox.innerText = "Ready. Perform your " + selectedExercise.toUpperCase() + " set 🔽";
+                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
+                }
 
             } else {
-                feedbackBox.innerText = "Full body not fully detected in frame ⚠️";
+                if (!isLiftActive) {
+                    feedbackBox.innerText = "Step back! Full body not fully detected in frame ⚠️";
+                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
+                }
             }
             canvasCtx.restore();
         }
@@ -174,9 +190,9 @@
             
             const avgSpeed = speedsList.length > 0 ? speedsList.reduce((a, b) => a + b, 0) / speedsList.length : 0.1;
             let finalRPE = "RPE 8.0";
-            if (avgSpeed > 0.3) finalRPE = "RPE 6.5 (Fast / Light)";
-            else if (avgSpeed > 0.15) finalRPE = "RPE 8.0 (Solid Speed)";
-            else if (avgSpeed > 0.05) finalRPE = "RPE 9.0 (Heavy Grind)";
+            if (avgSpeed > 0.35) finalRPE = "RPE 6.5 (Fast / Light)";
+            else if (avgSpeed > 0.18) finalRPE = "RPE 8.0 (Solid Speed)";
+            else if (avgSpeed > 0.06) finalRPE = "RPE 9.0 (Heavy Grind)";
             else finalRPE = "RPE 10 (Max Effort / Sticking Point)";
 
             let problemsHTML = "";
@@ -198,9 +214,6 @@
                     <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">${problemsHTML}</div>
                 </div>
             `;
-
-            speedsList = [];
-            formIssues = [];
         }
 
         function drawJointLine(p1, p2, color) {
@@ -227,7 +240,6 @@
 
         pose.onResults(onResults);
 
-        // ফ্রেম প্রসেসিং লুপ
         async function processSourceFrame() {
             if (!activeSource.paused && !activeSource.ended) {
                 await pose.send({ image: activeSource });
@@ -235,12 +247,12 @@
             }
         }
 
-        // ক্যামেরা চালু করার ফাংশন
         async function startCamera() {
             if (currentStream) currentStream.getTracks().forEach(track => track.stop());
             if (uploadedVideoElement) uploadedVideoElement.pause();
             
             activeSource = webcamElement;
+            isLiftActive = false;
 
             let constraints = {
                 video: {
@@ -270,7 +282,6 @@
             };
         }
 
-        // ভিডিও আপলোড হ্যান্ডলার
         videoUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -283,9 +294,10 @@
             uploadedVideoElement.src = videoUrl;
             
             activeSource = uploadedVideoElement;
+            isLiftActive = false;
             uploadedVideoElement.play();
             
-            feedbackBox.innerText = "Analyzing uploaded video... 🎬";
+            feedbackBox.innerText = "Video loaded. Waiting for lift start... 🎬";
             processSourceFrame();
         });
 
@@ -295,12 +307,12 @@
         });
 
         resetLogBtn.addEventListener('click', () => {
-            logContent.innerHTML = `<p class="text-slate-500 italic">No analysis recorded yet. Complete a live set or upload a video.</p>`;
+            logContent.innerHTML = `<p class="text-slate-500 italic">No analysis recorded yet. Perform a lift to see results.</p>`;
             speedsList = [];
             formIssues = [];
+            isLiftActive = false;
         });
 
-        // ইনিশিয়াল স্টার্ট
         startCamera();
     </script>
 </body>
