@@ -134,7 +134,7 @@
                 if (timeDiff > 0.03) {
                     const velocity = Math.abs(currentY - lastY) / timeDiff;
 
-                    if (velocity > 0.03) {
+                    if (velocity > 0.02) {
                         isLiftActive = true;
                         velocities.push(velocity);
                     }
@@ -146,31 +146,30 @@
                             drawJointLine(leftKnee, leftAnkle, '#3b82f6');
                             const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
                             
-                            // প্যারালাল বা ডেপথ চেক
-                            if (kneeAngle < 85 && !formIssues.includes("Good Depth Reached")) {
-                                if(!formIssues.includes("Good Depth Reached")) formIssues.push("✓ Proper Squat Depth Achieved");
-                            } else if (kneeAngle >= 90 && !formIssues.includes("High Squat / Above Parallel")) {
-                                formIssues.push("⚠️ High Squat (Needs more depth)");
+                            if (kneeAngle < 85) {
+                                if(!formIssues.includes("✓ Proper Squat Depth Achieved")) formIssues.push("✓ Proper Squat Depth Achieved");
+                            } else {
+                                if(!formIssues.includes("⚠️ High Squat (Needs more depth)")) formIssues.push("⚠️ High Squat (Needs more depth)");
                             }
                         } else if (selectedExercise === 'bench') {
                             drawJointLine(leftShoulder, leftElbow, '#06b6d4');
                             drawJointLine(leftElbow, leftWrist, '#3b82f6');
                             const elbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
-                            if (elbowAngle < 70) {
-                                if(!formIssues.includes("Paused / Touching Chest")) formIssues.push("✓ Solid Touch / Control on Chest");
+                            if (elbowAngle < 75) {
+                                if(!formIssues.includes("✓ Solid Touch / Control on Chest")) formIssues.push("✓ Solid Touch / Control on Chest");
                             }
                         } else if (selectedExercise === 'deadlift') {
                             drawJointLine(leftShoulder, leftHip, '#06b6d4');
                             drawJointLine(leftHip, leftKnee, '#3b82f6');
                             const spineLean = Math.abs(leftShoulder.x - leftHip.x);
-                            if (spineLean > 0.30 && !formIssues.includes("Spine rounding detected")) {
-                                formIssues.push("⚠️ Spine rounding / Back flexion detected");
+                            if (spineLean > 0.32) {
+                                if(!formIssues.includes("⚠️ Spine rounding / Back flexion detected")) formIssues.push("⚠️ Spine rounding / Back flexion detected");
                             } else {
-                                if(!formIssues.includes("Neutral Spine Maintained")) formIssues.push("✓ Neutral Spine Maintained");
+                                if(!formIssues.includes("✓ Neutral Spine Maintained")) formIssues.push("✓ Neutral Spine Maintained");
                             }
                         }
 
-                        if (!isVideoMode && velocity < 0.01 && velocities.size > 15) {
+                        if (!isVideoMode && velocity < 0.01 && velocities.length > 15) {
                             finalizeSetAndLog(selectedExercise);
                         }
                     }
@@ -198,22 +197,26 @@
             isVideoMode = false;
             analyzeUploadBtn.classList.add('hidden');
             
-            // উন্নত RPE ক্যালকুলেশন অ্যালগরিদম (ভ্যালোসিটি ও গ্রাইন্ড টাইম ভিত্তিক)
             let finalRPE = "RPE 8.0";
             let rpeColor = "text-amber-400";
 
             if (velocities.length > 0) {
+                // টপ স্পিড এবং অ্যাভারেজ স্পিডের ডাইনামিক ডিস্ট্রিবিউশন
                 const maxVel = Math.max(...velocities);
                 const avgVel = velocities.reduce((a, b) => a + b, 0) / velocities.length;
 
-                if (maxVel > 0.45 || avgVel > 0.25) {
-                    finalRPE = "RPE 6.5 - 7.0 (Fast Speed / Light)";
+                // নতুন এবং সেন্সিটিভ থ্রেশহোল্ড যা বিভিন্ন ওজনের লিফট সঠিকভাবে আলাদা করবে
+                if (maxVel > 0.60 || avgVel > 0.30) {
+                    finalRPE = "RPE 6.0 - 6.5 (Very Fast / Warm-up Weight)";
                     rpeColor = "text-emerald-400";
-                } else if (maxVel > 0.25 || avgVel > 0.12) {
-                    finalRPE = "RPE 8.0 (Solid Powerlifting Speed)";
+                } else if (maxVel > 0.40 || avgVel > 0.18) {
+                    finalRPE = "RPE 7.0 - 7.5 (Moderate Speed / Speed Work)";
+                    rpeColor = "text-teal-400";
+                } else if (maxVel > 0.22 || avgVel > 0.09) {
+                    finalRPE = "RPE 8.0 - 8.5 (Heavy Working Set)";
                     rpeColor = "text-cyan-400";
-                } else if (maxVel > 0.10 || avgVel > 0.05) {
-                    finalRPE = "RPE 9.0 (Heavy Grind / Submaximal)";
+                } else if (maxVel > 0.10 || avgVel > 0.04) {
+                    finalRPE = "RPE 9.0 - 9.5 (Heavy Grind / Submaximal)";
                     rpeColor = "text-amber-400";
                 } else {
                     finalRPE = "RPE 10 (Max Effort / Ultimate Grinder)";
@@ -221,7 +224,6 @@
                 }
             }
 
-            // ইউনিক ফর্ম ইস্যু ফিল্টার করা
             let uniqueIssues = [...new Set(formIssues)];
             let problemsHTML = "";
             
@@ -302,7 +304,7 @@
             };
 
             try {
-                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream =- await navigator.mediaDevices.getUserMedia(constraints);
             } catch (err) {
                 try {
                     constraints = { video: { width: { ideal: 640 }, height: { ideal: 480 } } };
@@ -353,12 +355,6 @@
             uploadedVideoElement.pause();
         });
 
-        toggleCameraBtn.addEventListener('click', () => {
-            useFrontCommand: useFrontCamera = !useFrontCamera;
-            startCamera();
-        });
-
-        // ফিক্সড টগল হ্যান্ডলার
         toggleCameraBtn.onclick = () => {
             useFrontCamera = !useFrontCamera;
             startCamera();
