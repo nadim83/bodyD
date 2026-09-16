@@ -32,7 +32,7 @@
 
         <!-- Video Upload Section -->
         <div class="mt-4 p-4 bg-slate-800 border border-dashed border-slate-600 rounded-xl text-center">
-            <label class="block text-sm font-medium text-slate-300 mb-2">📁 Upload Lift Video (MP4/MOV) - Auto Analyzes on Play</label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">📁 Upload Lift Video (MP4/MOV) - Auto Plays & Analyzes</label>
             <input type="file" id="video-upload" accept="video/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
         </div>
     </header>
@@ -40,8 +40,9 @@
     <!-- Main Video/Upload & Canvas Container -->
     <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl flex justify-center items-center min-h-[360px]">
         <video id="webcam" class="hidden" autoplay playsinline muted></video>
-        <video id="uploaded-video" class="hidden" controls playsinline muted></video>
-        <canvas id="output_canvas" class="w-full h-auto block"></canvas>
+        <!-- ভিডিও প্লে করার জন্য সরাসরি দৃশ্যমান রাখা হয়েছে অথবা ক্যানভাসে রেন্ডার করার জন্য প্রস্তুত করা হয়েছে -->
+        <video id="uploaded-video" class="w-full h-auto block" controls playsinline muted></video>
+        <canvas id="output_canvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
     </div>
 
     <!-- Live Status Box -->
@@ -105,7 +106,10 @@
 
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            // যদি ওয়েবক্যাম হয় তবে ক্যানভাসে ড্র করব, আর আপলোড করা ভিডিও হলে ভিডিও ট্যাগ নিজেই প্লে হবে এবং ক্যানভাসে স্কেলেটন ওভারলে দেখাবে
+            if (activeSource === webcamElement) {
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            }
 
             const selectedExercise = exerciseSelect.value;
 
@@ -127,7 +131,6 @@
                 if (timeDiff > 0.03) {
                     const velocity = Math.abs(currentY - lastY) / timeDiff;
 
-                    // মুভমেন্ট পেলে ডেটা রেকর্ড করা শুরু হবে
                     if (velocity > 0.02) {
                         isProcessing = true;
                         velocities.push(velocity);
@@ -163,7 +166,6 @@
                             }
                         }
 
-                        // লাইভ ক্যামেরার ক্ষেত্রে লিফট শেষ হলে অটো সেভ হবে
                         if (activeSource === webcamElement && velocity < 0.01 && velocities.length > 15) {
                             finalizeSetAndLog(selectedExercise);
                         }
@@ -280,7 +282,8 @@
 
         async function startCamera() {
             if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-            if (uploadedVideoElement) uploadedVideoElement.pause();
+            uploadedVideoElement.classList.add('hidden');
+            webcamElement.classList.remove('hidden');
             
             activeSource = webcamElement;
             isProcessing = false;
@@ -315,7 +318,7 @@
             };
         }
 
-        // ভিডিও আপলোড করার সাথে সাথে অটো প্লে হবে এবং শেষ হলে অটো রেজাল্ট দেখাবে
+        // ফাইল আপলোড ইভেন্ট ফিক্সড
         videoUploadInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -325,21 +328,29 @@
             }
 
             const videoUrl = URL.createObjectURL(file);
+            
+            // ওয়েবক্যাম লুকিয়ে আপলোড করা ভিডিও ভিজিবল করা
+            webcamElement.classList.add('hidden');
+            uploadedVideoElement.classList.remove('hidden');
+
             uploadedVideoElement.src = videoUrl;
+            uploadedVideoElement.load();
             
             activeSource = uploadedVideoElement;
             isProcessing = true;
             velocities = [];
             formIssues = [];
 
-            uploadedVideoElement.play();
+            uploadedVideoElement.play().then(() => {
+                processSourceFrame();
+            }).catch(e => {
+                console.error("Autoplay prevented:", e);
+            });
             
-            feedbackBox.innerText = "Analyzing uploaded video automatically... 🎬";
+            feedbackBox.innerText = "Video playing and analyzing automatically... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
-            
-            processSourceFrame();
 
-            // ভিডিও শেষ হওয়ার সাথে সাথেই অটো RPE ও সামারি জেনারেট করবে
+            // ভিডিও শেষ হলে অটো RPE এবং সামারি জেনারেট হবে
             uploadedVideoElement.onended = () => {
                 const selectedExercise = exerciseSelect.value;
                 finalizeSetAndLog(selectedExercise);
