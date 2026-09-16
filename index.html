@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Full-Body Posture Scanner (Optimized)</title>
+    <title>AI Powerlifting & Posture Scanner with Auto RPE</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -13,16 +13,16 @@
 
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Full-Body Posture & Alignment Scanner</h1>
-        <p class="text-slate-400 text-sm mb-4">Accurate posture scan with enhanced stability and tracking.</p>
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift & Posture Analyzer</h1>
+        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking & Estimated RPE.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
             <select id="analysis-mode" class="w-full sm:flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 focus:outline-none focus:border-cyan-400">
                 <option value="posture">পূর্ণাঙ্গ শারীরিক ভঙ্গি স্ক্যান (Posture & Symmetry)</option>
-                <option value="squat">স্কোয়াট ফর্ম এনালাইসিস</option>
-                <option value="bench">বেঞ্চ প্রেস ফর্ম এনালাইসিস</option>
-                <option value="deadlift">ডেডলিফ্ট মেরুদণ্ড ও হিংজ স্ক্যান</option>
+                <option value="squat">স্কোয়াট ফর্ম ও RPE এনালাইসিস</option>
+                <option value="bench">বেঞ্চ প্রেস ফর্ম ও RPE এনালাইসিস</option>
+                <option value="deadlift">ডেডলিফ্ট ফর্ম ও RPE এনালাইসিস</option>
             </select>
 
             <!-- Camera Switch Button -->
@@ -33,7 +33,7 @@
 
         <!-- Video Upload Section -->
         <div class="mt-4 p-4 bg-slate-800 border border-dashed border-slate-600 rounded-xl text-center">
-            <label class="block text-sm font-medium text-slate-300 mb-2">📁 ভিডিও আপলোড করুন (ভঙ্গি বা লিফ্ট চেক করার জন্য)</label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">📁 লিফটের ভিডিও আপলোড করুন (স্কোয়াট/বেঞ্চ/ডেডলিফ্ট)</label>
             <input type="file" id="video-upload" accept="video/*" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
         </div>
     </header>
@@ -47,23 +47,23 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        ক্যামেরার সামনে পুরো বডি নিয়ে সোজা হয়ে দাঁড়ান... ⏳
+        ক্যামেরার সামনে বা ভিডিও আপলোড করে লিফট শুরু করুন... ⏳
     </div>
 
     <!-- Posture & Diagnostics Summary Section -->
     <div class="mt-6 w-full max-w-2xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
         <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-bold text-cyan-400">📋 শারীরিক ভঙ্গি ও ডায়াগনস্টিক রিপোর্ট</h2>
+            <h2 class="text-xl font-bold text-cyan-400">📋 ফর্ম ও RPE ডায়াগনস্টিক রিপোর্ট</h2>
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">লগ মুছুন</button>
         </div>
         <div id="log-content" class="space-y-2 text-slate-300 text-sm">
-            <p class="text-slate-500 italic">এখনো কোনো স্ক্যান রেকর্ড করা হয়নি। ক্যামেরার সামনে সোজা হয়ে দাঁড়ান।</p>
+            <p class="text-slate-500 italic">এখনো কোনো লিফটের ডেটা রেকর্ড করা হয়নি।</p>
         </div>
     </div>
 
     <!-- Footer -->
     <footer class="mt-8 text-slate-500 text-xs">
-        Powered by MediaPipe Pose Biomechanics & Advanced Posture Algorithms
+        Powered by Biomechanics & Bar Velocity RPE Estimation
     </footer>
 
     <!-- App Logic Script -->
@@ -87,6 +87,13 @@
         let detectedIssues = [];
         let isSending = false;
         let scanCompleted = false;
+
+        // RPE tracking variables
+        let repSpeeds = [];
+        let lastHipY = 0;
+        let lastWristY = 0;
+        let movementDirection = 'down';
+        let repCount = 0;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -131,12 +138,9 @@
                 scanFramesCount++;
 
                 if (currentMode === 'posture') {
-                    // --- Optimized Full Body Posture & Symmetry Analysis ---
-                    
-                    // থ্রেশহোল্ড মান বাড়িয়ে সামান্য তারতম্য এড়িয়ে চলা হয়েছে যাতে নিখুঁত ত্রুটি ধরা পড়ে
                     const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
                     if (shoulderDiff > 0.045) {
-                        const side = leftShoulder.y < rightShoulder.y ? "বাম কাঁধ লক্ষণীয়ভাবে উঁচুতে রয়েছে" : "ডান কাঁধ লক্ষণীয়ভাবে উঁচুতে রয়েছে";
+                        const side = leftShoulder.y < rightShoulder.y ? "বাম কাঁধ উঁচুতে রয়েছে" : "ডান কাঁধ উঁচুতে রয়েছে";
                         addUniqueIssue(`⚠️ অসামঞ্জস্যতা: ${side}`);
                         drawJointLine(leftShoulder, rightShoulder, '#f43f5e');
                     } else {
@@ -151,27 +155,11 @@
                         drawJointLine(leftHip, rightHip, '#10b981');
                     }
 
-                    const midShoulderX = (leftShoulder.x + rightShoulder.x) / 2;
-                    const headForwardDist = Math.abs(nose.x - midShoulderX);
-                    if (headForwardDist > 0.10) {
-                        addUniqueIssue("⚠️ মাথা অতিরিক্ত সামনের দিকে ঝুঁকে আছে (Cervical Strain Risk)");
-                    } else {
-                        if (!detectedIssues.includes("✓ মাথা ও ঘাড়ের অবস্থান সঠিক রয়েছে")) {
-                            detectedIssues.push("✓ মাথা ও ঘাড়ের অবস্থান সঠিক রয়েছে");
-                        }
-                    }
-
-                    drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                    drawJointLine(rightShoulder, rightHip, '#06b6d4');
-                    drawJointLine(leftHip, leftKnee, '#3b82f6');
-                    drawJointLine(rightHip, rightKnee, '#3b82f6');
-
-                    feedbackBox.innerText = `ভঙ্গি স্ক্যান চলছে (${Math.min(100, Math.round((scanFramesCount/200)*100))}%)... সোজা হয়ে দাঁড়ান 🔄`;
+                    feedbackBox.innerText = `ভঙ্গি স্ক্যান চলছে (${Math.min(100, Math.round((scanFramesCount/200)*100))}%)...`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
-                    // স্ক্যানিং আরও নিখুঁত করতে ফ্রেম কাউন্ট ২০০ করা হয়েছে (প্রায় ৭ সেকেন্ড)
                     if (scanFramesCount > 200 && !scanCompleted) {
-                        finalizePostureLog();
+                        finalizeLog("পূর্ণাঙ্গ শারীরিক ভঙ্গি মূল্যায়ন");
                         scanCompleted = true;
                     }
 
@@ -181,12 +169,21 @@
                     drawJointLine(leftKnee, leftAnkle, '#3b82f6');
                     
                     const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+                    
+                    // Track rep speed for RPE calculation based on hip Y movement
+                    let speed = Math.abs(leftHip.y - lastHipY);
+                    lastHipY = leftHip.y;
+                    repSpeeds.push(speed);
+
+                    let estimatedRPE = estimateRPE(repSpeeds);
+
                     if (kneeAngle < 85) {
                         addUniqueIssue("✓ সঠিক স্কোয়াট ডেপথ বা গভীরতা অর্জিত হয়েছে");
                     } else if (kneeAngle > 110) {
                         addUniqueIssue("⚠️ স্কোয়াটের গভীরতা কম হয়েছে (উঁচু স্কোয়াট)");
                     }
-                    feedbackBox.innerText = `স্কোয়াট মোড সচল | হাঁটু কোণ: ${Math.round(kneeAngle)}° 🏋️`;
+
+                    feedbackBox.innerText = `🏋️ স্কোয়াট মোড | হাঁটু কোণ: ${Math.round(kneeAngle)}° | আনুমানিক RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
                 } else if (currentMode === 'bench') {
@@ -194,30 +191,55 @@
                     drawJointLine(leftElbow, leftWrist, '#3b82f6');
                     
                     const elbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+                    
+                    let speed = Math.abs(leftWrist.y - lastWristY);
+                    lastWristY = leftWrist.y;
+                    repSpeeds.push(speed);
+
+                    let estimatedRPE = estimateRPE(repSpeeds);
+
                     if (elbowAngle < 75) {
                         addUniqueIssue("✓ বুকে সঠিকভাবে বার স্পর্শ করেছে");
                     }
-                    feedbackBox.innerText = `বেঞ্চ প্রেস মোড সচল | কনুই কোণ: ${Math.round(elbowAngle)}° 🦾`;
+
+                    feedbackBox.innerText = `🦾 বেঞ্চ প্রেস মোড | কনুই কোণ: ${Math.round(elbowAngle)}° | আনুমানিক RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
                 } else if (currentMode === 'deadlift') {
                     drawJointLine(leftShoulder, leftHip, '#06b6d4');
                     drawJointLine(leftHip, leftKnee, '#3b82f6');
                     
+                    let speed = Math.abs(leftHip.y - lastHipY);
+                    lastHipY = leftHip.y;
+                    repSpeeds.push(speed);
+
+                    let estimatedRPE = estimateRPE(repSpeeds);
                     const spineLean = Math.abs(leftShoulder.x - leftHip.x);
+
                     if (spineLean > 0.35) {
                         addUniqueIssue("⚠️ নিচের পিঠ বা মেরুদণ্ড বাঁকা হয়ে যাচ্ছে (ঝুঁকিপূর্ণ)");
                     } else {
                         addUniqueIssue("✓ মেরুদণ্ড স্বাভাবিক বা নিউট্রাল রয়েছে");
                     }
-                    feedbackBox.innerText = "ডেডলিফ্ট স্পাইন ট্র্যাকিং সচল ⚡";
+
+                    feedbackBox.innerText = `⚡ ডেডলিফ্ট মোড | স্পাইন ট্র্যাকিং সচল | আনুমানিক RPE: ${estimatedRPE}`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
                 }
-            } else {
-                feedbackBox.innerText = "পূর্ণ বডি ক্যামেরার ফ্রেমে আনুন (মাথা থেকে পা পর্যন্ত) ⚠️";
-                feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
             }
             canvasCtx.restore();
+        }
+
+        function estimateRPE(speeds) {
+            if (speeds.length < 10) return "8.0 (শুরু হচ্ছে)";
+            // Average the last few frames to gauge movement velocity drop (Grind factor)
+            const recentSpeeds = speeds.slice(-15);
+            const avgSpeed = recentSpeeds.reduce((a, b) => a + b, 0) / recentSpeeds.length;
+            
+            // Lower speed/stalling during lift indicates higher RPE (closer to failure)
+            if (avgSpeed < 0.002) return "9.5 - 10 (অতিরিক্ত কষ্ট/Grind)";
+            if (avgSpeed < 0.005) return "8.5 - 9.0 (ভারী এফোর্ট)";
+            if (avgSpeed < 0.010) return "7.5 - 8.0 (দৃঢ় গতি)";
+            return "6.5 - 7.0 (সহজ ও সাবলীল)";
         }
 
         function addUniqueIssue(issue) {
@@ -226,12 +248,12 @@
             }
         }
 
-        function finalizePostureLog() {
+        function finalizeLog(modeName) {
             let uniqueIssues = [...new Set(detectedIssues)];
             let problemsHTML = "";
             
             if (uniqueIssues.length === 0) {
-                problemsHTML = `<span class="text-emerald-400 font-semibold text-base">✨ চমৎকার ভঙ্গি ও সামঞ্জস্যতা! বড় কোনো শারীরিক ত্রুটি পাওয়া যায়নি।</span>`;
+                problemsHTML = `<span class="text-emerald-400 font-semibold text-base">✨ চমৎকার ফর্ম! বড় কোনো ভুল পাওয়া যায়নি।</span>`;
             } else {
                 problemsHTML = `<ul class="space-y-1">` + uniqueIssues.map(err => {
                     let colorClass = err.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400';
@@ -244,7 +266,7 @@
             logContent.innerHTML = `
                 <div class="bg-slate-900/90 p-4 rounded-xl border border-slate-700 mb-2 shadow-inner">
                     <div class="flex justify-between font-bold text-cyan-300 text-base mb-1">
-                        <span>স্ক্যানের ধরন: পূর্ণাঙ্গ শারীরিক ভঙ্গি মূল্যায়ন</span>
+                        <span>বিশ্লেষণের ধরন: ${modeName}</span>
                         <span class="text-emerald-400">সম্পন্ন</span>
                     </div>
                     <div class="text-xs text-slate-400 mb-3">সময়: ${timestamp}</div>
@@ -252,7 +274,7 @@
                 </div>
             `;
             
-            feedbackBox.innerText = "ভঙ্গি স্ক্যান সফলভাবে সম্পন্ন হয়েছে! 🎯";
+            feedbackBox.innerText = "বিশ্লেষণ সম্পন্ন হয়েছে! নিচের লগ দেখুন 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
         }
 
@@ -270,7 +292,6 @@
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
 
-        // কনফিডেন্স ও স্মুথিং অপ্টিমাইজ করা হলো যাতে জাস্ট ফ্লিকারিং বা ভুল রেজাল্ট না আসে
         pose.setOptions({
             modelComplexity: 1,
             smoothLandmarks: true,
@@ -304,6 +325,7 @@
             activeSource = webcamElement;
             scanFramesCount = 0;
             detectedIssues = [];
+            repSpeeds = [];
             scanCompleted = false;
 
             let constraints = {
@@ -353,6 +375,7 @@
             activeSource = uploadedVideoElement;
             scanFramesCount = 0;
             detectedIssues = [];
+            repSpeeds = [];
             scanCompleted = false;
 
             uploadedVideoElement.play().then(() => {
@@ -362,11 +385,11 @@
                 feedbackBox.innerText = "ভিডিও চালু করতে প্লে বাটনে ক্লিক করুন ⚠️";
             });
             
-            feedbackBox.innerText = "ভিডিওর ভঙ্গি বিশ্লেষণ করা হচ্ছে... 🎬";
+            feedbackBox.innerText = "ভিডিওর লিফট ও RPE বিশ্লেষণ করা হচ্ছে... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
             uploadedVideoElement.onended = () => {
-                finalizePostureLog();
+                finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
             };
         });
 
@@ -376,15 +399,17 @@
         };
 
         resetLogBtn.addEventListener('click', () => {
-            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো স্ক্যান রেকর্ড করা হয়নি। ক্যামেরার সামনে সোজা হয়ে দাঁড়ান।</p>`;
+            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো লিফটের ডেটা রেকর্ড করা হয়নি।</p>`;
             detectedIssues = [];
             scanFramesCount = 0;
+            repSpeeds = [];
             scanCompleted = false;
         });
 
         modeSelect.addEventListener('change', () => {
             detectedIssues = [];
             scanFramesCount = 0;
+            repSpeeds = [];
             scanCompleted = false;
         });
 
