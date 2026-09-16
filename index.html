@@ -6,25 +6,30 @@
     <title>AI Powerlifting Form & RPE Detector</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MediaPipe Pose JS Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <!-- MediaPipe Pose JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-6">
 
-    <!-- Header & Exercise Selector -->
+    <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting & RPE Detector</h1>
-        <p class="text-slate-400 text-sm mb-4">Stand sideways to the camera, select your exercise, and lift.</p>
+        <p class="text-slate-400 text-sm mb-4">Select your exercise and camera mode below.</p>
         
-        <!-- Exercise Selector & Live RPE Badge -->
-        <div class="flex gap-4 items-center">
-            <select id="exercise-type" class="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 focus:outline-none focus:border-cyan-400">
+        <!-- Controls Row -->
+        <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <select id="exercise-type" class="w-full sm:flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 focus:outline-none focus:border-cyan-400">
                 <option value="squat">Squat Form & RPE</option>
                 <option value="bench">Bench Press Form & RPE</option>
                 <option value="deadlift">Deadlift Form & RPE</option>
             </select>
-            <div id="rpe-badge" class="px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl font-bold text-amber-400 text-center min-w-[120px]">
+
+            <!-- Camera Switch Button -->
+            <button id="toggle-camera" class="w-full sm:w-auto px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-cyan-400 transition">
+                📷 Switch Camera (Back/Front)
+            </button>
+
+            <div id="rpe-badge" class="w-full sm:w-auto px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl font-bold text-amber-400 text-center min-w-[120px]">
                 RPE: --
             </div>
         </div>
@@ -33,7 +38,7 @@
     <!-- Main Video & Canvas Container -->
     <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
         <video id="webcam" class="hidden" autoplay playsinline></video>
-        <canvas id="output_canvas" class="w-full h-auto block transform -scale-x-100"></canvas>
+        <canvas id="output_canvas" class="w-full h-auto block"></canvas>
     </div>
 
     <!-- Status / Real-time Feedback Box -->
@@ -54,7 +59,10 @@
         const feedbackBox = document.getElementById('feedback-box');
         const exerciseSelect = document.getElementById('exercise-type');
         const rpeBadge = document.getElementById('rpe-badge');
+        const toggleCameraBtn = document.getElementById('toggle-camera');
 
+        let useFrontCamera = true; // ডিফল্ট ক্যামেরা স্টেট
+        let currentStream = null;
         let lastY = 0;
         let lastTime = Date.now();
         let estimatedRPE = "--";
@@ -90,17 +98,16 @@
                 const leftElbow = landmarks[13];
                 const leftWrist = landmarks[15];
 
-                // --- Velocity & RPE Calculation Based on Movement Speed ---
+                // Velocity & RPE Calculation
                 const currentTime = Date.now();
-                const timeDiff = (currentTime - lastTime) / 1000; // seconds
+                const timeDiff = (currentTime - lastTime) / 1000;
                 
-                let currentY = leftHip.y; // Using hip/shoulder movement as reference
+                let currentY = leftHip.y;
                 if (selectedExercise === 'bench') currentY = leftWrist.y;
 
                 if (timeDiff > 0.05) {
                     const speed = Math.abs(currentY - lastY) / timeDiff;
                     
-                    // Estimating RPE based on ascent velocity (lower speed under load = higher RPE)
                     if (speed > 0.4) {
                         estimatedRPE = "RPE 6 - 7 (Fast)";
                         rpeBadge.className = "px-4 py-3 bg-emerald-950 border border-emerald-500 rounded-xl font-bold text-emerald-400 text-center min-w-[120px]";
@@ -121,7 +128,6 @@
 
                 rpeBadge.innerText = estimatedRPE;
 
-                // --- Exercise Specific Form Logic ---
                 if (selectedExercise === 'squat') {
                     drawJointLine(leftShoulder, leftHip, '#06b6d4');
                     drawJointLine(leftHip, leftKnee, '#3b82f6');
@@ -190,6 +196,7 @@
             canvasCtx.stroke();
         }
 
+        // Initialize MediaPipe Pose Model
         const pose = new Pose({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
@@ -204,19 +211,49 @@
 
         pose.onResults(onResults);
 
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await pose.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
+        // Custom Camera Stream Function with Back/Front Camera Switch Support
+        async function startCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            const constraints = {
+                video: {
+                    facingMode: useFrontCamera ? "user" : "environment", // "environment" মানে পেছনের ক্যামেরা
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            };
+
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = currentStream;
+                await videoElement.play();
+
+                // Frame processing loop
+                async function processVideoFrame() {
+                    if (!videoElement.paused && !videoElement.ended) {
+                        await pose.send({ image: videoElement });
+                        requestAnimationFrame(processVideoFrame);
+                    }
+                }
+                processVideoFrame();
+
+            } catch (err) {
+                console.error("Camera access error:", err);
+                feedbackBox.innerText = "Camera access denied or unavailable. Please allow permissions.";
+                feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-rose-950/80 border border-rose-500 rounded-xl text-center text-xl font-semibold text-rose-400 shadow-lg";
+            }
+        }
+
+        // Switch Camera Button Event
+        toggleCameraBtn.addEventListener('click', () => {
+            useFrontCamera = !useFrontCamera;
+            startCamera();
         });
-        
-        camera.start().catch(err => {
-            console.error("Camera access error:", err);
-            feedbackBox.innerText = "Camera access denied or unavailable. Please allow webcam permission.";
-            feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-rose-950/80 border border-rose-500 rounded-xl text-center text-xl font-semibold text-rose-400 shadow-lg";
-        });
+
+        // Initial Start
+        startCamera();
     </script>
 </body>
 </html>
