@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Full-Body Posture Scanner (Bangla)</title>
+    <title>AI Powerlifting & Full-Body Posture Scanner (Optimized)</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -14,7 +14,7 @@
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Full-Body Posture & Alignment Scanner</h1>
-        <p class="text-slate-400 text-sm mb-4">Rotate in front of the camera to detect posture imbalances & structural issues in Bangla.</p>
+        <p class="text-slate-400 text-sm mb-4">Accurate posture scan with enhanced stability and tracking.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -47,7 +47,7 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        ক্যামেরার সামনে দাঁড়িয়ে নিজের বডি ঘুরিয়ে ভঙ্গি স্ক্যান করুন... ⏳
+        ক্যামেরার সামনে পুরো বডি নিয়ে সোজা হয়ে দাঁড়ান... ⏳
     </div>
 
     <!-- Posture & Diagnostics Summary Section -->
@@ -57,7 +57,7 @@
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">লগ মুছুন</button>
         </div>
         <div id="log-content" class="space-y-2 text-slate-300 text-sm">
-            <p class="text-slate-500 italic">এখনো কোনো স্ক্যান রেকর্ড করা হয়নি। ক্যামেরার সামনে দাঁড়িয়ে ধীরে ধীরে ঘুরুন।</p>
+            <p class="text-slate-500 italic">এখনো কোনো স্ক্যান রেকর্ড করা হয়নি। ক্যামেরার সামনে সোজা হয়ে দাঁড়ান।</p>
         </div>
     </div>
 
@@ -131,11 +131,12 @@
                 scanFramesCount++;
 
                 if (currentMode === 'posture') {
-                    // --- 360 Full Body Posture & Symmetry Analysis (Bangla) ---
+                    // --- Optimized Full Body Posture & Symmetry Analysis ---
                     
+                    // থ্রেশহোল্ড মান বাড়িয়ে সামান্য তারতম্য এড়িয়ে চলা হয়েছে যাতে নিখুঁত ত্রুটি ধরা পড়ে
                     const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
-                    if (shoulderDiff > 0.035) {
-                        const side = leftShoulder.y < rightShoulder.y ? "বাম কাঁধ উঁচুতে রয়েছে" : "ডান কাঁধ উঁচুতে রয়েছে";
+                    if (shoulderDiff > 0.045) {
+                        const side = leftShoulder.y < rightShoulder.y ? "বাম কাঁধ লক্ষণীয়ভাবে উঁচুতে রয়েছে" : "ডান কাঁধ লক্ষণীয়ভাবে উঁচুতে রয়েছে";
                         addUniqueIssue(`⚠️ অসামঞ্জস্যতা: ${side}`);
                         drawJointLine(leftShoulder, rightShoulder, '#f43f5e');
                     } else {
@@ -143,7 +144,7 @@
                     }
 
                     const hipDiff = Math.abs(leftHip.y - rightHip.y);
-                    if (hipDiff > 0.03) {
+                    if (hipDiff > 0.04) {
                         addUniqueIssue("⚠️ কোমরের ভারসাম্যহীনতা বা পেলভিক টিল্ট শনাক্ত হয়েছে");
                         drawJointLine(leftHip, rightHip, '#f43f5e');
                     } else {
@@ -152,8 +153,8 @@
 
                     const midShoulderX = (leftShoulder.x + rightShoulder.x) / 2;
                     const headForwardDist = Math.abs(nose.x - midShoulderX);
-                    if (headForwardDist > 0.08) {
-                        addUniqueIssue("⚠️ মাথা সামনের দিকে ঝুঁকে আছে (ঘাড়ে চাপের ঝুঁকি)");
+                    if (headForwardDist > 0.10) {
+                        addUniqueIssue("⚠️ মাথা অতিরিক্ত সামনের দিকে ঝুঁকে আছে (Cervical Strain Risk)");
                     } else {
                         if (!detectedIssues.includes("✓ মাথা ও ঘাড়ের অবস্থান সঠিক রয়েছে")) {
                             detectedIssues.push("✓ মাথা ও ঘাড়ের অবস্থান সঠিক রয়েছে");
@@ -165,10 +166,11 @@
                     drawJointLine(leftHip, leftKnee, '#3b82f6');
                     drawJointLine(rightHip, rightKnee, '#3b82f6');
 
-                    feedbackBox.innerText = "ভঙ্গি ও সামঞ্জস্যতা স্ক্যান করা হচ্ছে... ফ্রেমের সামনে একটু ঘুরুন 🔄";
+                    feedbackBox.innerText = `ভঙ্গি স্ক্যান চলছে (${Math.min(100, Math.round((scanFramesCount/200)*100))}%)... সোজা হয়ে দাঁড়ান 🔄`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
-                    if (scanFramesCount > 150 && !scanCompleted) {
+                    // স্ক্যানিং আরও নিখুঁত করতে ফ্রেম কাউন্ট ২০০ করা হয়েছে (প্রায় ৭ সেকেন্ড)
+                    if (scanFramesCount > 200 && !scanCompleted) {
                         finalizePostureLog();
                         scanCompleted = true;
                     }
@@ -203,7 +205,7 @@
                     drawJointLine(leftHip, leftKnee, '#3b82f6');
                     
                     const spineLean = Math.abs(leftShoulder.x - leftHip.x);
-                    if (spineLean > 0.32) {
+                    if (spineLean > 0.35) {
                         addUniqueIssue("⚠️ নিচের পিঠ বা মেরুদণ্ড বাঁকা হয়ে যাচ্ছে (ঝুঁকিপূর্ণ)");
                     } else {
                         addUniqueIssue("✓ মেরুদণ্ড স্বাভাবিক বা নিউট্রাল রয়েছে");
@@ -211,6 +213,9 @@
                     feedbackBox.innerText = "ডেডলিফ্ট স্পাইন ট্র্যাকিং সচল ⚡";
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
                 }
+            } else {
+                feedbackBox.innerText = "পূর্ণ বডি ক্যামেরার ফ্রেমে আনুন (মাথা থেকে পা পর্যন্ত) ⚠️";
+                feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-lg font-semibold text-amber-400 shadow-lg";
             }
             canvasCtx.restore();
         }
@@ -247,7 +252,7 @@
                 </div>
             `;
             
-            feedbackBox.innerText = "ভঙ্গি স্ক্যান সম্পন্ন হয়েছে! নিচের ডায়াগনস্টিক রিপোর্ট দেখুন 🎯";
+            feedbackBox.innerText = "ভঙ্গি স্ক্যান সফলভাবে সম্পন্ন হয়েছে! 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
         }
 
@@ -265,12 +270,13 @@
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
 
+        // কনফিডেন্স ও স্মুথিং অপ্টিমাইজ করা হলো যাতে জাস্ট ফ্লিকারিং বা ভুল রেজাল্ট না আসে
         pose.setOptions({
             modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
         });
 
         pose.onResults(onResults);
@@ -356,7 +362,7 @@
                 feedbackBox.innerText = "ভিডিও চালু করতে প্লে বাটনে ক্লিক করুন ⚠️";
             });
             
-            feedbackBox.innerText = "ভিডিওর ভঙ্গি ও ফর্ম বিশ্লেষণ করা হচ্ছে... 🎬";
+            feedbackBox.innerText = "ভিডিওর ভঙ্গি বিশ্লেষণ করা হচ্ছে... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
             uploadedVideoElement.onended = () => {
@@ -370,7 +376,7 @@
         };
 
         resetLogBtn.addEventListener('click', () => {
-            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো স্ক্যান রেকর্ড করা হয়নি। ক্যামেরার সামনে দাঁড়িয়ে ধীরে ধীরে ঘুরুন।</p>`;
+            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো স্ক্যান রেকর্ড করা হয়নি। ক্যামেরার সামনে সোজা হয়ে দাঁড়ান।</p>`;
             detectedIssues = [];
             scanFramesCount = 0;
             scanCompleted = false;
