@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting Form & RPE Detector</title>
+    <title>AI Powerlifting Form & Session Log</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -13,25 +13,21 @@
 
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting & RPE Detector</h1>
-        <p class="text-slate-400 text-sm mb-4">Select your exercise and camera mode below.</p>
+        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🏋️ AI Powerlifting Form & RPE Logger</h1>
+        <p class="text-slate-400 text-sm mb-4">Complete your set, and your final RPE & feedback will be logged below.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
             <select id="exercise-type" class="w-full sm:flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 focus:outline-none focus:border-cyan-400">
-                <option value="squat">Squat Form & RPE</option>
-                <option value="bench">Bench Press Form & RPE</option>
-                <option value="deadlift">Deadlift Form & RPE</option>
+                <option value="squat">Squat Analysis</option>
+                <option value="bench">Bench Press Analysis</option>
+                <option value="deadlift">Deadlift Analysis</option>
             </select>
 
             <!-- Camera Switch Button -->
             <button id="toggle-camera" class="w-full sm:w-auto px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-cyan-400 transition">
-                📷 Switch Camera (Back/Front)
+                📷 Switch Camera
             </button>
-
-            <div id="rpe-badge" class="w-full sm:w-auto px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl font-bold text-amber-400 text-center min-w-[120px]">
-                RPE: --
-            </div>
         </div>
     </header>
 
@@ -41,9 +37,20 @@
         <canvas id="output_canvas" class="w-full h-auto block"></canvas>
     </div>
 
-    <!-- Status / Real-time Feedback Box -->
-    <div id="feedback-box" class="mt-6 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-xl font-semibold text-cyan-300 shadow-lg transition-all duration-200">
-        Initializing AI Camera & Velocity Tracker...
+    <!-- Live Status Box -->
+    <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
+        Get into position and start your set...
+    </div>
+
+    <!-- Set Summary & Log Section (যেখানে ফাইনাল রেজাল্ট সেভ হবে) -->
+    <div class="mt-6 w-full max-w-2xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
+        <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
+            <h2 class="text-xl font-bold text-cyan-400">📋 Completed Set Summary</h2>
+            <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">Clear Log</button>
+        </div>
+        <div id="log-content" class="space-y-2 text-slate-300 text-sm">
+            <p class="text-slate-500 italic">No sets recorded yet. Finish a rep sequence to log results.</p>
+        </div>
     </div>
 
     <!-- Footer -->
@@ -58,21 +65,23 @@
         const canvasCtx = canvasElement.getContext('2d');
         const feedbackBox = document.getElementById('feedback-box');
         const exerciseSelect = document.getElementById('exercise-type');
-        const rpeBadge = document.getElementById('rpe-badge');
         const toggleCameraBtn = document.getElementById('toggle-camera');
+        const logContent = document.getElementById('log-content');
+        const resetLogBtn = document.getElementById('reset-log');
 
-        let useFrontCamera = false; // প্রথমে ব্যাক ক্যামেরা ট্রাই করার জন্য false রাখা হলো
+        let useFrontCamera = false;
         let currentStream = null;
+        
         let lastY = 0;
         let lastTime = Date.now();
-        let estimatedRPE = "--";
+        let speedsList = [];
+        let formIssues = [];
+        let isLiftActive = false;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
             let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) {
-                angle = 360 - angle;
-            }
+            if (angle > 180.0) angle = 360 - angle;
             return angle;
         }
 
@@ -92,7 +101,6 @@
 
             if (results.poseLandmarks) {
                 const landmarks = results.poseLandmarks;
-
                 const leftShoulder = landmarks[11];
                 const leftHip = landmarks[23];
                 const leftKnee = landmarks[25];
@@ -100,93 +108,103 @@
                 const leftElbow = landmarks[13];
                 const leftWrist = landmarks[15];
 
-                // Velocity & RPE Calculation
+                // Velocity Tracking Calculation
                 const currentTime = Date.now();
                 const timeDiff = (currentTime - lastTime) / 1000;
-                
                 let currentY = leftHip.y;
                 if (selectedExercise === 'bench') currentY = leftWrist.y;
 
                 if (timeDiff > 0.05) {
                     const speed = Math.abs(currentY - lastY) / timeDiff;
                     
-                    if (speed > 0.4) {
-                        estimatedRPE = "RPE 6 - 7 (Fast)";
-                        rpeBadge.className = "px-4 py-3 bg-emerald-950 border border-emerald-500 rounded-xl font-bold text-emerald-400 text-center min-w-[120px]";
-                    } else if (speed > 0.15 && speed <= 0.4) {
-                        estimatedRPE = "RPE 8 - 8.5 (Moderate)";
-                        rpeBadge.className = "px-4 py-3 bg-cyan-950 border border-cyan-500 rounded-xl font-bold text-cyan-400 text-center min-w-[120px]";
-                    } else if (speed > 0.02 && speed <= 0.15) {
-                        estimatedRPE = "RPE 9 - 9.5 (Heavy/Grind)";
-                        rpeBadge.className = "px-4 py-3 bg-amber-950 border border-amber-500 rounded-xl font-bold text-amber-400 text-center min-w-[120px]";
-                    } else if (speed <= 0.02 && speed > 0.001) {
-                        estimatedRPE = "RPE 10 (Max Effort)";
-                        rpeBadge.className = "px-4 py-3 bg-rose-950 border border-rose-500 rounded-xl font-bold text-rose-400 text-center min-w-[120px]";
+                    // লিফট শুরু হওয়ার শর্ত (যখন গতি নির্দিষ্ট সীমার বেশি হয়)
+                    if (speed > 0.05) {
+                        isLiftActive = true;
+                        speedsList.push(speed);
                     }
-                    
+
+                    // ফর্ম চেক ও ইস্যু রেকর্ড করা
+                    if (selectedExercise === 'squat') {
+                        drawJointLine(leftShoulder, leftHip, '#06b6d4');
+                        drawJointLine(leftHip, leftKnee, '#3b82f6');
+                        drawJointLine(leftKnee, leftAnkle, '#3b82f6');
+                        const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+                        
+                        if (kneeAngle < 75 && !formIssues.includes("Deep squat depth (Watch lower back wink)")) {
+                            formIssues.push("Deep squat depth (Watch lower back wink)");
+                        }
+                    } else if (selectedExercise === 'bench') {
+                        drawJointLine(leftShoulder, leftElbow, '#06b6d4');
+                        drawJointLine(leftElbow, leftWrist, '#3b82f6');
+                    } else if (selectedExercise === 'deadlift') {
+                        drawJointLine(leftShoulder, leftHip, '#06b6d4');
+                        drawJointLine(leftHip, leftKnee, '#3b82f6');
+                        const torsoLean = Math.abs(leftShoulder.x - leftHip.x);
+                        if (torsoLean > 0.28 && !formIssues.includes("Spine rounding / back flexion detected")) {
+                            formIssues.push("Spine rounding / back flexion detected");
+                        }
+                    }
+
+                    // লিফট শেষ হওয়ার লজিক (দীর্ঘক্ষণ মুভমেন্ট না থাকলে বা স্ট্যান্ডিং পজিশনে আসলে সেট শেষ বলে গণ্য হবে)
+                    if (isLiftActive && speed < 0.01 && speedsList.length > 10) {
+                        finalizeSetAndLog(selectedExercise);
+                    }
+
                     lastY = currentY;
                     lastTime = currentTime;
                 }
 
-                rpeBadge.innerText = estimatedRPE;
-
-                if (selectedExercise === 'squat') {
-                    drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                    drawJointLine(leftHip, leftKnee, '#3b82f6');
-                    drawJointLine(leftKnee, leftAnkle, '#3b82f6');
-
-                    const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
-
-                    if (kneeAngle > 150) {
-                        feedbackBox.innerText = "Squat Ready. Chest up, brace core 🔽";
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-xl font-semibold text-cyan-300 shadow-lg";
-                    } else if (kneeAngle >= 80 && kneeAngle <= 110) {
-                        feedbackBox.innerText = "Parallel Depth Achieved! Drive up 🔥";
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-xl font-semibold text-emerald-400 shadow-lg";
-                    } else {
-                        feedbackBox.innerText = `Squatting... (Knee Angle: ${Math.round(kneeAngle)}°)`;
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-xl font-semibold text-blue-300 shadow-lg";
-                    }
-
-                } else if (selectedExercise === 'bench') {
-                    drawJointLine(leftShoulder, leftElbow, '#06b6d4');
-                    drawJointLine(leftElbow, leftWrist, '#3b82f6');
-
-                    const elbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
-
-                    if (elbowAngle > 160) {
-                        feedbackBox.innerText = "Lockout. Unrack & control descent 🔽";
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-xl font-semibold text-cyan-300 shadow-lg";
-                    } else if (elbowAngle >= 70 && elbowAngle <= 100) {
-                        feedbackBox.innerText = "Good Touch Point & Flare! Press 🔥";
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-xl font-semibold text-emerald-400 shadow-lg";
-                    } else {
-                        feedbackBox.innerText = `Pressing... (Elbow Angle: ${Math.round(elbowAngle)}°)`;
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-xl font-semibold text-blue-300 shadow-lg";
-                    }
-
-                } else if (selectedExercise === 'deadlift') {
-                    drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                    drawJointLine(leftHip, leftKnee, '#3b82f6');
-
-                    const torsoLean = Math.abs(leftShoulder.x - leftHip.x);
-
-                    if (torsoLean > 0.28) {
-                        feedbackBox.innerText = "⚠️ WARNING: Spine rounding / back flexion detected!";
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-rose-950/80 border border-rose-500 rounded-xl text-center text-xl font-semibold text-rose-400 shadow-lg";
-                    } else {
-                        feedbackBox.innerText = "Deadlift Form Neutral. Pull through floor 🚀";
-                        feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-xl font-semibold text-emerald-400 shadow-lg";
-                    }
-                }
+                feedbackBox.innerText = isLiftActive ? "Lifting in progress... Keep executing! 🔥" : "Ready. Perform your set 🔽";
 
             } else {
-                feedbackBox.innerText = "Step back! Full body not detected in camera frame ⚠️";
-                feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-amber-950/80 border border-amber-500 rounded-xl text-center text-xl font-semibold text-amber-400 shadow-lg";
-                rpeBadge.innerText = "RPE: --";
+                feedbackBox.innerText = "Step back! Full body not detected in frame ⚠️";
             }
             canvasCtx.restore();
         }
+
+        // সেট শেষ হলে সামারি সেকশনে সেভ করার ফাংশন
+        function finalizeSetAndLog(exercise) {
+            isLiftActive = false;
+            
+            // গড় স্পিড থেকে RPE নির্ধারণ
+            const avgSpeed = speedsList.reduce((a, b) => a + b, 0) / speedsList.length;
+            let finalRPE = "RPE 8.0";
+            if (avgSpeed > 0.3) finalRPE = "RPE 6.5 (Fast)";
+            else if (avgSpeed > 0.15) finalRPE = "RPE 8.0 (Solid)";
+            else if (avgSpeed > 0.05) finalRPE = "RPE 9.0 (Heavy Grind)";
+            else finalRPE = "RPE 10 (Max Effort)";
+
+            let problemsHTML = "";
+            if (formIssues.length === 0) {
+                problemsHTML = `<span class="text-emerald-400 font-semibold">✨ Good Form! No major issues detected.</span>`;
+            } else {
+                problemsHTML = `<ul class="list-disc list-inside text-rose-400">` + formIssues.map(err => `<li>${err}</li>`).join('') + `</ul>`;
+            }
+
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // লগে যোগ করা
+            logContent.innerHTML = `
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700 mb-2">
+                    <div class="flex justify-between font-bold text-cyan-300 mb-1">
+                        <span>Exercise: ${exercise.toUpperCase()}</span>
+                        <span class="text-amber-400">${finalRPE}</span>
+                    </div>
+                    <div class="text-xs text-slate-400 mb-2">Logged at: ${timestamp}</div>
+                    <div>${problemsHTML}</div>
+                </div>
+            `;
+
+            // ডাটা রিসেট পরবর্তী সেটের জন্য
+            speedsList = [];
+            formIssues = [];
+        }
+
+        resetLogBtn.addEventListener('click', () => {
+            logContent.innerHTML = `<p class="text-slate-500 italic">No sets recorded yet. Finish a rep sequence to log results.</p>`;
+            speedsList = [];
+            formIssues = [];
+        });
 
         function drawJointLine(p1, p2, color) {
             if (!p1 || !p2) return;
@@ -198,7 +216,6 @@
             canvasCtx.stroke();
         }
 
-        // Initialize MediaPipe Pose Model
         const pose = new Pose({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
@@ -213,11 +230,8 @@
 
         pose.onResults(onResults);
 
-        // Robust Camera Start Function with Fallback
         async function startCamera() {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
+            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
 
             let constraints = {
                 video: {
@@ -230,21 +244,16 @@
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (err) {
-                // যদি ব্যাক ক্যামেরা (exact environment) ডিভাইস সমর্থন না করে, তবে সাধারণ ক্যামেরা রিকোয়েস্ট করবে
-                console.warn("Environment camera failed, switching to default camera...", err);
                 try {
                     constraints = { video: { width: { ideal: 640 }, height: { ideal: 480 } } };
                     currentStream = await navigator.mediaDevices.getUserMedia(constraints);
                 } catch (e) {
-                    console.error("Camera access totally failed:", e);
-                    feedbackBox.innerText = "Camera access denied or unavailable. Please check browser permissions.";
-                    feedbackBox.className = "mt-6 p-4 w-full max-w-2xl bg-rose-950/80 border border-rose-500 rounded-xl text-center text-xl font-semibold text-rose-400 shadow-lg";
+                    feedbackBox.innerText = "Camera access denied or unavailable.";
                     return;
                 }
             }
 
             videoElement.srcObject = currentStream;
-            
             videoElement.onloadedmetadata = () => {
                 videoElement.play().then(() => {
                     async function processVideoFrame() {
@@ -254,17 +263,15 @@
                         }
                     }
                     processVideoFrame();
-                }).catch(e => console.error("Video play error:", e));
+                });
             };
         }
 
-        // Switch Camera Button Event
         toggleCameraBtn.addEventListener('click', () => {
             useFrontCamera = !useFrontCamera;
             startCamera();
         });
 
-        // Initial Start
         startCamera();
     </script>
 </body>
