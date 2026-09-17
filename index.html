@@ -203,22 +203,22 @@
                         lastFrameTime = now;
                     }
 
-                    // 100% Precise Squat State Machine
-                    if (movementState === 'STANDING' && kneeAngle < 160) {
+                    // Strict IPF Standard Squat State Machine
+                    if (movementState === 'STANDING' && kneeAngle < 155) {
                         movementState = 'GOING_DOWN';
                         minAngleInRep = kneeAngle;
                     } else if (movementState === 'GOING_DOWN') {
                         if (kneeAngle < minAngleInRep) {
                             minAngleInRep = kneeAngle;
                         }
-                        // When knee angle starts increasing significantly, bottom is passed
-                        if (kneeAngle > minAngleInRep + 5) {
+                        if (kneeAngle > minAngleInRep + 4) {
                             movementState = 'GOING_UP';
                         }
-                    } else if (movementState === 'GOING_UP' && kneeAngle > 165) {
-                        // Rep Complete!
+                    } else if (movementState === 'GOING_UP' && kneeAngle > 160) {
                         totalReps++;
-                        if (minAngleInRep <= 95) {
+                        
+                        // Strict threshold (<= 105 degrees ensures true parallel/below parallel)
+                        if (minAngleInRep <= 105) {
                             goodLifts++;
                             addUniqueIssue(`✓ Rep ${totalReps}: সঠিক ডেপথ (${Math.round(minAngleInRep)}°) - Good Lift`);
                         } else {
@@ -285,9 +285,9 @@
                     }
 
                     if (movementState === 'STANDING' && leftHip.y < 0.55) {
-                        movementState = 'GOING_DOWN'; // bending down to grip
+                        movementState = 'GOING_DOWN';
                     } else if (movementState === 'GOING_DOWN' && leftHip.y > 0.6) {
-                        movementState = 'GOING_UP'; // lifting up
+                        movementState = 'GOING_UP';
                     } else if (movementState === 'GOING_UP' && leftHip.y < 0.45) {
                         totalReps++;
                         if (spineLean <= 0.35) {
@@ -309,14 +309,14 @@
         }
 
         function calculateAccurateRPE() {
-            if (repVelocities.length < 5) return "7.0";
+            if (repVelocities.length < 5) return "7.5";
             const recent = repVelocities.slice(-20);
             const avgVel = recent.reduce((a, b) => a + b, 0) / recent.length;
             
-            if (avgVel < 0.05) return "9.5 (ভীষণ ভারী গ্রাইন্ড)";
-            if (avgVel < 0.12) return "9.0 (চ্যালেঞ্জিং)";
-            if (avgVel < 0.25) return "8.0 - 8.5 (দৃঢ় পেস)";
-            if (avgVel < 0.40) return "7.0 - 7.5 (মডারেট)";
+            if (avgVel < 0.04) return "9.5 - 10 (সর্বোচ্চ প্রচেষ্টা / গ্রাইন্ড)";
+            if (avgVel < 0.09) return "9.0 (খুব ভারী)";
+            if (avgVel < 0.18) return "8.0 - 8.5 (দৃঢ় পেস)";
+            if (avgVel < 0.35) return "7.0 - 7.5 (মডারেট)";
             return "6.0 - 6.5 (সহজ)";
         }
 
