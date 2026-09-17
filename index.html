@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting Form & FMS Scanner</title>
+    <title>AI Body Posture & Alignment Analyzer</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -13,15 +13,13 @@
 
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-xl w-full">
-        <h1 class="text-2xl font-bold text-cyan-400 mb-1">🛡️ AI Form & FMS Screening Pro</h1>
-        <p class="text-slate-400 text-xs mb-3">Instant Form Correction & Functional Movement Screening.</p>
+        <h1 class="text-2xl font-bold text-cyan-400 mb-1">🧍‍♂️ AI Body Posture & Alignment Analyzer</h1>
+        <p class="text-slate-400 text-xs mb-3">আপনার শরীরের ভঙ্গি ও পোস্টার ত্রুটি নিখুঁতভাবে স্ক্যান করুন।</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col gap-2">
             <select id="analysis-mode" class="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 text-sm focus:outline-none focus:border-cyan-400">
-                <option value="fms">FMS টেস্ট ও মুভমেন্ট স্ক্রীনিং (Functional Movement Screen)</option>
-                <option value="squat_form">স্কোয়াট ফর্ম ও পসচার চেক (Squat Form Check)</option>
-                <option value="upper_form">আপার বডি ফর্ম ও অ্যাসিমেট্রি (Upper Body Posture)</option>
+                <option value="full_posture">পূর্ণাঙ্গ বডি পোস্টার ও অ্যালাইনমেন্ট স্ক্যান</option>
             </select>
 
             <button id="toggle-camera" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-cyan-400 text-sm transition">
@@ -32,7 +30,7 @@
         <!-- Live Control Button -->
         <div class="mt-3">
             <button id="live-toggle-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm">
-                🟢 স্ক্যানিং শুরু করুন
+                🟢 পোস্টার স্ক্যান শুরু করুন
             </button>
         </div>
     </header>
@@ -45,23 +43,23 @@
 
     <!-- Live Status Box -->
     <div id="feedback-box" class="mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg">
-        ক্যামেরা অন করে "স্ক্যানিং শুরু করুন" বাটনে চাপ দিন... ⏳
+        ক্যামেরা সামনে দাঁড়িয়ে "পোস্টার স্ক্যান শুরু করুন" বাটনে চাপ দিন... ⏳
     </div>
 
-    <!-- Summary Report Section -->
+    <!-- Detailed Diagnostic Report Section -->
     <div class="mt-4 w-full max-w-xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-4 shadow-xl">
         <div class="flex justify-between items-center mb-2 border-b border-slate-700 pb-2">
-            <h2 class="text-base font-bold text-cyan-400">📋 লাইভ স্ক্যান ও ডায়াগনস্টিক রিপোর্ট</h2>
+            <h2 class="text-base font-bold text-cyan-400">📋 বিস্তারিত পোস্টার ডায়াগনস্টিক রিপোর্ট</h2>
             <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-slate-300 transition">রিসেট</button>
         </div>
-        <div id="log-content" class="space-y-1 text-slate-300 text-xs">
-            <p class="text-slate-500 italic">এখনো কোনো স্ক্যান করা হয়নি।</p>
+        <div id="log-content" class="space-y-2 text-slate-300 text-xs">
+            <p class="text-slate-500 italic">এখনো কোনো পোস্টার স্ক্যান করা হয়নি। ক্যামেরার সামনে দাঁড়িয়ে স্ক্যান শুরু করুন।</p>
         </div>
     </div>
 
     <!-- Footer -->
     <footer class="mt-6 text-slate-500 text-[10px]">
-        AI Biomechanics & FMS Engine
+        AI Biomechanics Posture Engine
     </footer>
 
     <!-- App Logic Script -->
@@ -71,7 +69,6 @@
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
         const feedbackBox = document.getElementById('feedback-box');
-        const modeSelect = document.getElementById('analysis-mode');
         const toggleCameraBtn = document.getElementById('toggle-camera');
         const logContent = document.getElementById('log-content');
         const resetLogBtn = document.getElementById('reset-log');
@@ -82,13 +79,6 @@
         let detectedIssues = [];
         let scanFramesCount = 0;
         let isSending = false;
-
-        function calculateAngle(a, b, c) {
-            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
-            let angle = Math.abs(radians * 180.0 / Math.PI);
-            if (angle > 180.0) angle = 360 - angle;
-            return angle;
-        }
 
         function onResults(results) {
             if (!isScanning) return;
@@ -102,81 +92,58 @@
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-            const currentMode = modeSelect.value;
-
             if (results.poseLandmarks) {
                 const landmarks = results.poseLandmarks;
+                const nose = landmarks[0];
                 const leftShoulder = landmarks[11];
                 const rightShoulder = landmarks[12];
                 const leftHip = landmarks[23];
                 const rightHip = landmarks[24];
-                const leftKnee = landmarks[25];
-                const rightKnee = landmarks[26];
-                const leftAnkle = landmarks[27];
+                const leftEar = landmarks[7];
+                const rightEar = landmarks[8];
 
                 scanFramesCount++;
 
-                if (currentMode === 'fms') {
-                    // FMS Mobility & Symmetry Check
-                    const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
-                    if (shoulderDiff > 0.03) {
-                        addUniqueIssue("⚠️ কাঁধের ভারসাম্যহীনতা (Shoulder Asymmetry detected)");
-                        drawJointLine(leftShoulder, rightShoulder, '#f43f5e');
-                    } else {
-                        drawJointLine(leftShoulder, rightShoulder, '#10b981');
-                    }
+                // 1. Head Forward / Neck Lean Check (Forward Head Posture)
+                const earMidY = (leftEar.y + rightEar.y) / 2;
+                const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
+                const headForwardDist = Math.abs(nose.x - shoulderMidX);
+                
+                if (headForwardDist > 0.08) {
+                    addUniqueIssue("⚠️ **ফরোয়ার্ড হেড পোস্টার (Forward Head):** মাথা স্বাভাবিকের চেয়ে সামনের দিকে ঝুঁকে আছে।");
+                } else {
+                    addUniqueIssue("✓ মাথার পজিশন ও নেক অ্যালাইনমেন্ট সঠিক রয়েছে।");
+                }
 
-                    const hipDiff = Math.abs(leftHip.y - rightHip.y);
-                    if (hipDiff > 0.03) {
-                        addUniqueIssue("⚠️ পেলভিক টিল্ট / হিপ ভারসাম্যহীনতা");
-                        drawJointLine(leftHip, rightHip, '#f43f5e');
-                    } else {
-                        drawJointLine(leftHip, rightHip, '#10b981');
-                    }
+                // 2. Shoulder Level / Asymmetry Check
+                const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
+                if (shoulderDiff > 0.03) {
+                    addUniqueIssue(`⚠️ **কাঁধের ভারসাম্যহীনতা (Uneven Shoulders):** আপনার ${leftShoulder.y < rightShoulder.y ? 'বাম' : 'ডান'} কাঁধ কিছুটা উঁচুতে রয়েছে।`);
+                    drawJointLine(leftShoulder, rightShoulder, '#f43f5e');
+                } else {
+                    addUniqueIssue("✓ কাঁধের লেভেল ও ব্যালেন্স নিখুঁত আছে।");
+                    drawJointLine(leftShoulder, rightShoulder, '#10b981');
+                }
 
-                    feedbackBox.innerText = `FMS স্ক্যান চলছে... (${Math.min(100, Math.round((scanFramesCount/150)*100))}%)`;
-                    feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
+                // 3. Pelvic Tilt / Hip Asymmetry Check
+                const hipDiff = Math.abs(leftHip.y - rightHip.y);
+                if (hipDiff > 0.03) {
+                    addUniqueIssue(`⚠️ **পেলভিক টিল্ট (Pelvic/Hip Asymmetry):** কোমরের একপাশ অন্যদিকে চেয়ে হেলে আছে।`);
+                    drawJointLine(leftHip, rightHip, '#f43f5e');
+                } else {
+                    addUniqueIssue("✓ কোমরের লেভেল বা পেলভিস অ্যালাইনমেন্ট ঠিক আছে।");
+                    drawJointLine(leftHip, rightHip, '#10b981');
+                }
 
-                    if (scanFramesCount > 150) {
-                        finalizeScan("FMS স্ক্রীনিং রিপোর্ট");
-                    }
+                // Visual Skeleton Guides
+                drawJointLine(leftShoulder, leftHip, '#3b82f6');
+                drawJointLine(rightShoulder, rightHip, '#3b82f6');
 
-                } else if (currentMode === 'squat_form') {
-                    drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                    drawJointLine(leftHip, leftKnee, '#3b82f6');
-                    drawJointLine(leftKnee, leftAnkle, '#3b82f6');
+                feedbackBox.innerText = `পোস্টার স্ক্যান চলছে... স্থির হয়ে দাঁড়ান (${Math.min(100, Math.round((scanFramesCount/150)*100))}%)`;
+                feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
 
-                    const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
-
-                    if (kneeAngle < 110) {
-                        addUniqueIssue("✓ গভীর স্কোয়াট ডেপথ অর্জিত হয়েছে");
-                    } else if (kneeAngle > 140 && scanFramesCount > 50) {
-                        addUniqueIssue("⚠️ স্কোয়াট ডেপথ পর্যাপ্ত নয় (Parallel এর উপরে)");
-                    }
-
-                    feedbackBox.innerText = `স্কোয়াট ফর্ম স্ক্যান হচ্ছে... হাঁটু এঙ্গেল: ${Math.round(kneeAngle)}°`;
-                    feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
-
-                    if (scanFramesCount > 180) {
-                        finalizeScan("স্কোয়াট ফর্ম স্ক্যান রিপোর্ট");
-                    }
-
-                } else if (currentMode === 'upper_form') {
-                    drawJointLine(leftShoulder, rightShoulder, '#06b6d4');
-                    
-                    const spineLean = Math.abs(leftShoulder.x - leftHip.x);
-                    if (spineLean > 0.15) {
-                        addUniqueIssue("⚠️ উচ্চতা বা স্পাইনে অতিরিক্ত ল্যাটারাল ফ্লেকশন");
-                    } else {
-                        addUniqueIssue("✓ আপার বডি অ্যালাইনমেন্ট সঠিক রয়েছে");
-                    }
-
-                    feedbackBox.innerText = `আপার বডি স্ক্যান চলছে...`;
-                    feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
-
-                    if (scanFramesCount > 150) {
-                        finalizeScan("আপার বডি পোস্টার রিপোর্ট");
-                    }
+                if (scanFramesCount > 150) {
+                    finalizeScan();
                 }
             }
             canvasCtx.restore();
@@ -188,33 +155,32 @@
             }
         }
 
-        function finalizeScan(modeName) {
+        function finalizeScan() {
             isScanning = false;
-            liveToggleBtn.innerHTML = "🟢 স্ক্যানিং শুরু করুন";
+            liveToggleBtn.innerHTML = "🟢 পোস্টার স্ক্যান শুরু করুন";
             liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
 
-            let uniqueIssues = [...new Set(detectedIssues)];
-            let problemsHTML = uniqueIssues.length === 0 
-                ? `<span class="text-emerald-400 font-semibold">✨ কোনো ত্রুটি পাওয়া যায়নি! পারফেক্ট।</span>`
-                : `<ul class="space-y-1">` + uniqueIssues.map(err => `<li class="text-xs ${err.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400'}">${err}</li>`).join('') + `</ul>`;
+            let problemsHTML = detectedIssues.length === 0 
+                ? `<span class="text-emerald-400 font-semibold">✨ দারুণ! আপনার বডি পোস্টারে কোনো বড় ত্রুটি পাওয়া যায়নি।</span>`
+                : `<ul class="space-y-1.5">` + detectedIssues.map(err => `<li class="text-xs text-slate-200 border-b border-slate-800 pb-1">${err}</li>`).join('') + `</ul>`;
 
             const timestamp = new Date().toLocaleTimeString();
             
             logContent.innerHTML = `
                 <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
                     <div class="flex justify-between font-bold text-cyan-300 text-xs mb-1">
-                        <span>${modeName}</span>
-                        <span class="text-emerald-400">সম্পন্ন</span>
+                        <span>বডি পোস্টার ও অ্যালাইনমেন্ট এনালাইসিস</span>
+                        <span class="text-emerald-400">রিপোর্ট রেডি</span>
                     </div>
                     <div class="text-[10px] text-slate-400 mb-2">সময়: ${timestamp}</div>
-                    <div class="bg-slate-800 p-2 rounded-lg border border-slate-700">
-                        <div class="font-semibold text-cyan-400 mb-1 text-[11px]">পর্যবেক্ষণ ও ফলাফল:</div>
+                    <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                        <div class="font-semibold text-cyan-400 mb-1.5 text-xs">বিশ্লেষণ ও কোথায় কোথায় সমস্যা:</div>
                         ${problemsHTML}
                     </div>
                 </div>
             `;
             
-            feedbackBox.innerText = "স্ক্যান সম্পন্ন! নিচের রিপোর্টে ফলাফল দেখুন 🎯";
+            feedbackBox.innerText = "পোস্টার স্ক্যান সফলভাবে সম্পন্ন হয়েছে! নিচের রিপোর্ট দেখুন 🎯";
             feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-sm font-semibold text-emerald-300 shadow-lg";
         }
 
@@ -296,7 +262,7 @@
                 liveToggleBtn.className = "w-full py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
                 runAnalyzerLoop();
             } else {
-                finalizeScan("ম্যানুয়াল স্টপ");
+                finalizeScan();
             }
         });
 
@@ -306,21 +272,13 @@
         };
 
         resetLogBtn.addEventListener('click', () => {
-            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো স্ক্যান করা হয়নি।</p>`;
+            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো পোস্টার স্ক্যান করা হয়নি। ক্যামেরার সামনে দাঁড়িয়ে স্ক্যান শুরু করুন।</p>`;
             detectedIssues = [];
             scanFramesCount = 0;
             isScanning = false;
-            liveToggleBtn.innerHTML = "🟢 স্ক্যানিং শুরু করুন";
+            liveToggleBtn.innerHTML = "🟢 পোস্টার স্ক্যান শুরু করুন";
             liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
             feedbackBox.innerText = "রিসেট করা হয়েছে। স্ক্যান শুরু করতে বাটনে চাপ দিন।";
-        });
-
-        modeSelect.addEventListener('change', () => {
-            detectedIssues = [];
-            scanFramesCount = 0;
-            isScanning = false;
-            liveToggleBtn.innerHTML = "🟢 স্ক্যানিং শুরু করুন";
-            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
         });
 
         startCamera();
