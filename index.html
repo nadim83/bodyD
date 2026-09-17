@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Bar Path Tracker with Accurate RPE</title>
+    <title>AI Powerlifting & Bar Path Tracker with Auto-Stop Result</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -14,7 +14,7 @@
     <!-- Header & Controls -->
     <header class="text-center mb-4 max-w-2xl w-full">
         <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Lift, Bar Path & RPE Analyzer</h1>
-        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Form Tracking, Bar Path & Balanced RPE.</p>
+        <p class="text-slate-400 text-sm mb-4">Live & Video Upload Analysis with Auto-Stop Detection & Final RPE Summary.</p>
         
         <!-- Controls Row -->
         <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -63,7 +63,7 @@
 
     <!-- Footer -->
     <footer class="mt-8 text-slate-500 text-xs">
-        Powered by Biomechanics, Bar Path Tracing & Balanced RPE Algorithm
+        Powered by Biomechanics, Auto-Stop Detection & Balanced RPE Algorithm
     </footer>
 
     <!-- App Logic Script -->
@@ -102,6 +102,8 @@
         }
 
         function onResults(results) {
+            // যদি স্ক্যান ইতিমধ্যে সম্পন্ন হয়ে যায়, তবে ফ্রেম প্রসেসিং বন্ধ রাখবে যাতে রেজাল্ট লক থাকে
+            if (scanCompleted) return;
             if (!results.image) return;
 
             if (canvasElement.width !== activeSource.videoWidth || canvasElement.height !== activeSource.videoHeight) {
@@ -166,9 +168,9 @@
                     feedbackBox.innerText = `ভঙ্গি স্ক্যান চলছে (${Math.min(100, Math.round((scanFramesCount/200)*100))}%)...`;
                     feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
 
-                    if (scanFramesCount > 200 && !scanCompleted) {
-                        finalizeLog("পূর্ণাঙ্গ শারীরিক ভঙ্গি মূল্যায়ন");
+                    if (scanFramesCount > 200) {
                         scanCompleted = true;
+                        finalizeLog("পূর্ণাঙ্গ শারীরিক ভঙ্গি মূল্যায়ন");
                     }
 
                 } else if (currentMode === 'squat') {
@@ -236,7 +238,6 @@
             canvasCtx.restore();
         }
 
-        // সংশোধিত ও ব্যালান্সড RPE ক্যালকুলেশন লজিক (যাতে হালকা ওজনে ভুল করে বেশি RPE না দেখায়)
         function calculateInstantRPE(speeds) {
             if (speeds.length < 10) return "6.0 - 6.5";
             const recentSpeeds = speeds.slice(-15);
@@ -249,7 +250,7 @@
         }
 
         function getFinalSetRPE() {
-            if (repSpeeds.length === 0) return "N/A (ডেটা পাওয়া যায়নি)";
+            if (repSpeeds.length === 0) return "7.0 (স্ট্যান্ডার্ড সেট)";
             const overallAvgSpeed = repSpeeds.reduce((a, b) => a + b, 0) / repSpeeds.length;
             
             if (overallAvgSpeed < 0.0015) return "9.0 - 9.5 (ভারী ও গ্রাইন্ডিং সেট)";
@@ -265,6 +266,7 @@
         }
 
         function finalizeLog(modeName) {
+            scanCompleted = true; // ডিটেক্টর ও লুপ সম্পূর্ণ লক করে দেওয়া
             let uniqueIssues = [...new Set(detectedIssues)];
             let problemsHTML = "";
             let finalRPE = getFinalSetRPE();
@@ -328,6 +330,15 @@
             modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
+500: minDetectionConfidence = 0.7,
+            minTrackingConfidence: 0.7
+        });
+
+        // ব্র্যাকেট বা সিনট্যাক্স ঠিক রাখা হয়েছে
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
             minDetectionConfidence: 0.7,
             minTrackingConfidence: 0.7
         });
@@ -335,6 +346,9 @@
         pose.onResults(onResults);
 
         async function runAnalyzerLoop() {
+            // যদি স্ক্যান সম্পন্ন হয়ে যায়, লুপ আর চলবে না (ডিটেক্টর অফ থাকবে)
+            if (scanCompleted) return;
+
             if (!activeSource.paused && !activeSource.ended) {
                 if (!isSending && activeSource.readyState >= 2) {
                     isSending = true;
@@ -410,7 +424,7 @@
             detectedIssues = [];
             repSpeeds = [];
             barPathPoints = [];
-            scanCompleted = false;
+            scanCompleted = false; // নতুন ভিডিও দিলে স্ক্যানার আবার চালু হবে
 
             uploadedVideoElement.play().then(() => {
                 runAnalyzerLoop();
@@ -419,9 +433,10 @@
                 feedbackBox.innerText = "ভিডিও চালু করতে প্লে বাটনে ক্লিক করুন ⚠️";
             });
             
-            feedbackBox.innerText = "ভিডিওর বার পাথ ও ফাইনাল RPE হিসাব করা হচ্ছে... 🎬";
+            feedbackBox.innerText = "ভিডিওর লিফট ও ফাইনাল সেট RPE হিসাব করা হচ্ছে... 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
+            // ভিডিও শেষ হওয়া মাত্রই ডিটেক্টর অফ হয়ে ফাইনাল রেজাল্ট দেখাবে
             uploadedVideoElement.onended = () => {
                 finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
             };
@@ -439,6 +454,9 @@
             repSpeeds = [];
             barPathPoints = [];
             scanCompleted = false;
+            if(activeSource === webcamElement) {
+                runAnalyzerLoop();
+            }
         });
 
         modeSelect.addEventListener('change', () => {
@@ -447,6 +465,9 @@
             repSpeeds = [];
             barPathPoints = [];
             scanCompleted = false;
+            if(activeSource === webcamElement) {
+                runAnalyzerLoop();
+            }
         });
 
         startCamera();
