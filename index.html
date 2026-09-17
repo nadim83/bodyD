@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting & Bar Path Tracker with Auto-Stop Result</title>
+    <title>AI Powerlifting & Bar Path Tracker with Clean UI</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
@@ -41,8 +41,15 @@
     <!-- Main Video/Upload & Canvas Container -->
     <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl flex justify-center items-center min-h-[360px]">
         <video id="webcam" class="hidden" autoplay playsinline muted></video>
-        <video id="uploaded-video" class="w-full h-auto block" controls playsinline muted></video>
-        <canvas id="output_canvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+        <!-- ডিফল্ট কন্ট্রোলস সরিয়ে দেওয়া হয়েছে যাতে স্ক্রিনশটের মতো বিশৃঙ্খল না দেখায় -->
+        <video id="uploaded-video" class="w-full h-auto block" playsinline muted></video>
+        
+        <!-- কাস্টম প্লে/পজ ওভারলে বাটন -->
+        <button id="custom-play-btn" class="absolute inset-0 m-auto w-16 h-16 bg-cyan-600/80 hover:bg-cyan-500 text-white rounded-full flex items-center justify-center text-2xl shadow-lg transition backdrop-blur-sm hidden z-20">
+            ▶
+        </button>
+
+        <canvas id="output_canvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
     </div>
 
     <!-- Live Status Box -->
@@ -70,6 +77,7 @@
     <script type="module">
         const webcamElement = document.getElementById('webcam');
         const uploadedVideoElement = document.getElementById('uploaded-video');
+        const customPlayBtn = document.getElementById('custom-play-btn');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
         const feedbackBox = document.getElementById('feedback-box');
@@ -102,7 +110,6 @@
         }
 
         function onResults(results) {
-            // যদি স্ক্যান ইতিমধ্যে সম্পন্ন হয়ে যায়, তবে ফ্রেম প্রসেসিং বন্ধ রাখবে যাতে রেজাল্ট লক থাকে
             if (scanCompleted) return;
             if (!results.image) return;
 
@@ -123,17 +130,13 @@
             if (results.poseLandmarks) {
                 const landmarks = results.poseLandmarks;
                 
-                const nose = landmarks[0];
                 const leftShoulder = landmarks[11];
                 const rightShoulder = landmarks[12];
                 const leftHip = landmarks[23];
                 const rightHip = landmarks[24];
                 const leftKnee = landmarks[25];
-                const rightKnee = landmarks[26];
                 const leftAnkle = landmarks[27];
-                const rightAnkle = landmarks[28];
                 const leftWrist = landmarks[15];
-                const rightWrist = landmarks[16];
                 const leftElbow = landmarks[13];
 
                 scanFramesCount++;
@@ -266,7 +269,7 @@
         }
 
         function finalizeLog(modeName) {
-            scanCompleted = true; // ডিটেক্টর ও লুপ সম্পূর্ণ লক করে দেওয়া
+            scanCompleted = true;
             let uniqueIssues = [...new Set(detectedIssues)];
             let problemsHTML = "";
             let finalRPE = getFinalSetRPE();
@@ -298,6 +301,10 @@
             
             feedbackBox.innerText = "সেট বিশ্লেষণ সম্পন্ন হয়েছে! নিচের রিপোর্টে ফাইনাল RPE দেখুন 🎯";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
+            
+            // ভিডিও শেষ হলে কাস্টম প্লে বাটন আবার দৃশ্যমান করা
+            customPlayBtn.style.display = 'flex';
+            customPlayBtn.innerText = "▶";
         }
 
         function drawJointLine(p1, p2, color) {
@@ -330,15 +337,6 @@
             modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
-500: minDetectionConfidence = 0.7,
-            minTrackingConfidence: 0.7
-        });
-
-        // ব্র্যাকেট বা সিনট্যাক্স ঠিক রাখা হয়েছে
-        pose.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true,
-            enableSegmentation: false,
             minDetectionConfidence: 0.7,
             minTrackingConfidence: 0.7
         });
@@ -346,7 +344,6 @@
         pose.onResults(onResults);
 
         async function runAnalyzerLoop() {
-            // যদি স্ক্যান সম্পন্ন হয়ে যায়, লুপ আর চলবে না (ডিটেক্টর অফ থাকবে)
             if (scanCompleted) return;
 
             if (!activeSource.paused && !activeSource.ended) {
@@ -366,6 +363,7 @@
         async function startCamera() {
             if (currentStream) currentStream.getTracks().forEach(track => track.stop());
             uploadedVideoElement.classList.add('hidden');
+            customPlayBtn.classList.add('hidden');
             webcamElement.classList.remove('hidden');
             
             activeSource = webcamElement;
@@ -415,6 +413,7 @@
             
             webcamElement.classList.add('hidden');
             uploadedVideoElement.classList.remove('hidden');
+            customPlayBtn.classList.remove('hidden');
 
             uploadedVideoElement.src = videoUrl;
             uploadedVideoElement.load();
@@ -424,22 +423,44 @@
             detectedIssues = [];
             repSpeeds = [];
             barPathPoints = [];
-            scanCompleted = false; // নতুন ভিডিও দিলে স্ক্যানার আবার চালু হবে
+            scanCompleted = false;
 
-            uploadedVideoElement.play().then(() => {
-                runAnalyzerLoop();
-            }).catch(e => {
-                console.error("Autoplay prevented:", e);
-                feedbackBox.innerText = "ভিডিও চালু করতে প্লে বাটনে ক্লিক করুন ⚠️";
-            });
+            customPlayBtn.innerText = "▶";
             
-            feedbackBox.innerText = "ভিডিওর লিফট ও ফাইনাল সেট RPE হিসাব করা হচ্ছে... 🎬";
+            feedbackBox.innerText = "ভিডিও আপলোড হয়েছে। প্লে বাটনে ক্লিক করে লিফট বিশ্লেষণ শুরু করুন 🎬";
             feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
 
-            // ভিডিও শেষ হওয়া মাত্রই ডিটেক্টর অফ হয়ে ফাইনাল রেজাল্ট দেখাবে
             uploadedVideoElement.onended = () => {
                 finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
             };
+        });
+
+        // কাস্টম প্লে/পজ বাটনের কার্যকারিতা
+        customPlayBtn.addEventListener('click', () => {
+            if (uploadedVideoElement.paused) {
+                if (scanCompleted) {
+                    // পুনরায় প্লে করতে চাইলে রিসেট করে আবার শুরু হবে
+                    scanCompleted = false;
+                    detectedIssues = [];
+                    repSpeeds = [];
+                    barPathPoints = [];
+                    uploadedVideoElement.currentTime = 0;
+                }
+                uploadedVideoElement.play();
+                customPlayBtn.style.display = 'none';
+                runAnalyzerLoop();
+            } else {
+                uploadedVideoElement.pause();
+                customPlayBtn.style.display = 'flex';
+                customPlayBtn.innerText = "▶";
+            }
+        });
+
+        uploadedVideoElement.addEventListener('pause', () => {
+            if (!uploadedVideoElement.ended) {
+                customPlayBtn.style.display = 'flex';
+                customPlayBtn.innerText = "▶";
+            }
         });
 
         toggleCameraBtn.onclick = () => {
@@ -456,6 +477,10 @@
             scanCompleted = false;
             if(activeSource === webcamElement) {
                 runAnalyzerLoop();
+            } else {
+                uploadedVideoElement.currentTime = 0;
+                uploadedVideoElement.pause();
+                customPlayBtn.style.display = 'flex';
             }
         });
 
