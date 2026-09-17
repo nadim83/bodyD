@@ -3,118 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Powerlifting Pro - 100% Precise Analyzer</title>
+    <title>AI Powerlifting Form & FMS Scanner</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- MediaPipe Pose JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-6">
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4">
 
     <!-- Header & Controls -->
-    <header class="text-center mb-4 max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-cyan-400 mb-2">🧬 Biomechanical Powerlifting Pro</h1>
-        <p class="text-slate-400 text-sm mb-4">100% Precise Reps, Good/No Lift & RPE Calculation System.</p>
+    <header class="text-center mb-4 max-w-xl w-full">
+        <h1 class="text-2xl font-bold text-cyan-400 mb-1">🛡️ AI Form & FMS Screening Pro</h1>
+        <p class="text-slate-400 text-xs mb-3">Instant Form Correction & Functional Movement Screening.</p>
         
         <!-- Controls Row -->
-        <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <select id="analysis-mode" class="w-full sm:flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 focus:outline-none focus:border-cyan-400">
-                <option value="posture">পূর্ণাঙ্গ শারীরিক ভঙ্গি স্ক্যান (Posture & Symmetry)</option>
-                <option value="squat">স্কোয়াট ফর্ম, Reps ও Good/No Lift</option>
-                <option value="bench">বেঞ্চ প্রেস ফর্ম, Reps ও Good/No Lift</option>
-                <option value="deadlift">ডেডলিফ্ট ফর্ম, Reps ও Good/No Lift</option>
+        <div class="flex flex-col gap-2">
+            <select id="analysis-mode" class="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl font-semibold text-cyan-300 text-sm focus:outline-none focus:border-cyan-400">
+                <option value="fms">FMS টেস্ট ও মুভমেন্ট স্ক্রীনিং (Functional Movement Screen)</option>
+                <option value="squat_form">স্কোয়াট ফর্ম ও পসচার চেক (Squat Form Check)</option>
+                <option value="upper_form">আপার বডি ফর্ম ও অ্যাসিমেট্রি (Upper Body Posture)</option>
             </select>
 
-            <!-- Camera Switch Button -->
-            <button id="toggle-camera" class="w-full sm:w-auto px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-cyan-400 transition">
-                📷 ক্যামেরা পরিবর্তন
+            <button id="toggle-camera" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-cyan-400 text-sm transition">
+                📷 ক্যামেরা পরিবর্তন (Front/Back)
             </button>
         </div>
 
-        <!-- Live Control & Video Upload Section -->
-        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <!-- Live Toggle Button -->
-            <button id="live-toggle-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2">
-                🟢 লাইভ ডিটেকশন শুরু করুন
+        <!-- Live Control Button -->
+        <div class="mt-3">
+            <button id="live-toggle-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm">
+                🟢 স্ক্যানিং শুরু করুন
             </button>
-
-            <!-- Video Upload Input -->
-            <div class="p-2 bg-slate-800 border border-dashed border-slate-600 rounded-xl text-center flex items-center justify-center">
-                <input type="file" id="video-upload" accept="video/*" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
-            </div>
         </div>
     </header>
 
-    <!-- Main Video/Upload & Canvas Container -->
-    <div class="relative w-full max-w-2xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl flex justify-center items-center min-h-[360px]">
-        <video id="webcam" class="hidden" autoplay playsinline muted></video>
-        <video id="uploaded-video" class="w-full h-auto block hidden" playsinline muted></video>
-        
-        <!-- Custom Play/Pause Overlay for Uploaded Video -->
-        <button id="custom-play-btn" class="absolute inset-0 m-auto w-16 h-16 bg-cyan-600/80 hover:bg-cyan-500 text-white rounded-full flex items-center justify-center text-2xl shadow-lg transition backdrop-blur-sm hidden z-20">
-            ▶
-        </button>
-
+    <!-- Main Video & Canvas Container -->
+    <div class="relative w-full max-w-xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-xl flex justify-center items-center min-h-[300px]">
+        <video id="webcam" class="w-full h-auto block" autoplay playsinline muted></video>
         <canvas id="output_canvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
     </div>
 
     <!-- Live Status Box -->
-    <div id="feedback-box" class="mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg">
-        ক্যামেরা অন করে "লাইভ ডিটেকশন শুরু করুন" বাটনে চাপ দিন অথবা ভিডিও আপলোড করুন... ⏳
+    <div id="feedback-box" class="mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg">
+        ক্যামেরা অন করে "স্ক্যানিং শুরু করুন" বাটনে চাপ দিন... ⏳
     </div>
 
-    <!-- Posture & Diagnostics Summary Section -->
-    <div class="mt-6 w-full max-w-2xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-5 shadow-2xl">
-        <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
-            <h2 class="text-xl font-bold text-cyan-400">📋 বিস্তারিত পারফরম্যান্স ও জাজমেন্ট রিপোর্ট</h2>
-            <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300 transition">রিসেট করুন</button>
+    <!-- Summary Report Section -->
+    <div class="mt-4 w-full max-w-xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-4 shadow-xl">
+        <div class="flex justify-between items-center mb-2 border-b border-slate-700 pb-2">
+            <h2 class="text-base font-bold text-cyan-400">📋 লাইভ স্ক্যান ও ডায়াগনস্টিক রিপোর্ট</h2>
+            <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-slate-300 transition">রিসেট</button>
         </div>
-        <div id="log-content" class="space-y-2 text-slate-300 text-sm">
-            <p class="text-slate-500 italic">এখনো কোনো লিফটের ডেটা রেকর্ড করা হয়নি।</p>
+        <div id="log-content" class="space-y-1 text-slate-300 text-xs">
+            <p class="text-slate-500 italic">এখনো কোনো স্ক্যান করা হয়নি।</p>
         </div>
     </div>
 
     <!-- Footer -->
-    <footer class="mt-8 text-slate-500 text-xs">
-        Powered by AI Biomechanics, Reps Counter & Competition Judge System
+    <footer class="mt-6 text-slate-500 text-[10px]">
+        AI Biomechanics & FMS Engine
     </footer>
 
     <!-- App Logic Script -->
     <script type="module">
         const webcamElement = document.getElementById('webcam');
-        const uploadedVideoElement = document.getElementById('uploaded-video');
-        const customPlayBtn = document.getElementById('custom-play-btn');
         const liveToggleBtn = document.getElementById('live-toggle-btn');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
         const feedbackBox = document.getElementById('feedback-box');
         const modeSelect = document.getElementById('analysis-mode');
         const toggleCameraBtn = document.getElementById('toggle-camera');
-        const videoUploadInput = document.getElementById('video-upload');
         const logContent = document.getElementById('log-content');
         const resetLogBtn = document.getElementById('reset-log');
 
         let useFrontCamera = false;
         let currentStream = null;
-        let activeSource = webcamElement;
-
-        let scanFramesCount = 0;
+        let isScanning = false;
         let detectedIssues = [];
+        let scanFramesCount = 0;
         let isSending = false;
-        let scanCompleted = true;
-        let isLiveActive = false;
-
-        // Precise Reps & Judging variables
-        let barPathPoints = [];
-        let totalReps = 0;
-        let goodLifts = 0;
-        let noLifts = 0;
-        
-        let movementState = 'STANDING'; // 'STANDING', 'GOING_DOWN', 'BOTTOM', 'GOING_UP'
-        let minAngleInRep = 180;
-        let repVelocities = [];
-        let lastFrameTime = performance.now();
-        let lastPositionVal = 0;
 
         function calculateAngle(a, b, c) {
             const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -124,20 +91,16 @@
         }
 
         function onResults(results) {
-            if (scanCompleted) return;
+            if (!isScanning) return;
             if (!results.image) return;
 
-            if (canvasElement.width !== activeSource.videoWidth || canvasElement.height !== activeSource.videoHeight) {
-                canvasElement.width = activeSource.videoWidth || 640;
-                canvasElement.height = activeSource.videoHeight || 480;
+            if (canvasElement.width !== webcamElement.videoWidth || canvasElement.height !== webcamElement.videoHeight) {
+                canvasElement.width = webcamElement.videoWidth || 640;
+                canvasElement.height = webcamElement.videoHeight || 480;
             }
 
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            
-            if (activeSource === webcamElement) {
-                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-            }
 
             const currentMode = modeSelect.value;
 
@@ -148,176 +111,75 @@
                 const leftHip = landmarks[23];
                 const rightHip = landmarks[24];
                 const leftKnee = landmarks[25];
+                const rightKnee = landmarks[26];
                 const leftAnkle = landmarks[27];
-                const leftWrist = landmarks[15];
-                const leftElbow = landmarks[13];
 
                 scanFramesCount++;
 
-                if (currentMode !== 'posture' && leftWrist) {
-                    barPathPoints.pathKey = barPathPoints.pathKey || [];
-                    barPathPoints.push({ x: leftWrist.x * canvasElement.width, y: leftWrist.y * canvasElement.height });
-                    if (barPathPoints.length > 250) barPathPoints.shift();
-                }
-
-                drawBarPath();
-
-                if (currentMode === 'posture') {
+                if (currentMode === 'fms') {
+                    // FMS Mobility & Symmetry Check
                     const shoulderDiff = Math.abs(leftShoulder.y - rightShoulder.y);
-                    if (shoulderDiff > 0.04) {
-                        addUniqueIssue("⚠️ কাঁধের ভারসাম্যহীনতা (Unlevel Shoulders)");
+                    if (shoulderDiff > 0.03) {
+                        addUniqueIssue("⚠️ কাঁধের ভারসাম্যহীনতা (Shoulder Asymmetry detected)");
                         drawJointLine(leftShoulder, rightShoulder, '#f43f5e');
                     } else {
                         drawJointLine(leftShoulder, rightShoulder, '#10b981');
                     }
 
                     const hipDiff = Math.abs(leftHip.y - rightHip.y);
-                    if (hipDiff > 0.035) {
-                        addUniqueIssue("⚠️ পেলভিক টিল্ট বা কোমরের ভারসাম্যহীনতা");
+                    if (hipDiff > 0.03) {
+                        addUniqueIssue("⚠️ পেলভিক টিল্ট / হিপ ভারসাম্যহীনতা");
                         drawJointLine(leftHip, rightHip, '#f43f5e');
                     } else {
                         drawJointLine(leftHip, rightHip, '#10b981');
                     }
 
-                    feedbackBox.innerText = `ভঙ্গি স্ক্যান চলছে... (${Math.min(100, Math.round((scanFramesCount/200)*100)) }%)`;
-                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-lg font-semibold text-cyan-300 shadow-lg";
+                    feedbackBox.innerText = `FMS স্ক্যান চলছে... (${Math.min(100, Math.round((scanFramesCount/150)*100))}%)`;
+                    feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
 
-                    if (scanFramesCount > 200) {
-                        finalizeLog("পূর্ণাঙ্গ শারীরিক ভঙ্গি মূল্যায়ন");
+                    if (scanFramesCount > 150) {
+                        finalizeScan("FMS স্ক্রীনিং রিপোর্ট");
                     }
 
-                } else if (currentMode === 'squat') {
+                } else if (currentMode === 'squat_form') {
                     drawJointLine(leftShoulder, leftHip, '#06b6d4');
                     drawJointLine(leftHip, leftKnee, '#3b82f6');
                     drawJointLine(leftKnee, leftAnkle, '#3b82f6');
-                    
+
                     const kneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+
+                    if (kneeAngle < 110) {
+                        addUniqueIssue("✓ গভীর স্কোয়াট ডেপথ অর্জিত হয়েছে");
+                    } else if (kneeAngle > 140 && scanFramesCount > 50) {
+                        addUniqueIssue("⚠️ স্কোয়াট ডেপথ পর্যাপ্ত নয় (Parallel এর উপরে)");
+                    }
+
+                    feedbackBox.innerText = `স্কোয়াট ফর্ম স্ক্যান হচ্ছে... হাঁটু এঙ্গেল: ${Math.round(kneeAngle)}°`;
+                    feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
+
+                    if (scanFramesCount > 180) {
+                        finalizeScan("স্কোয়াট ফর্ম স্ক্যান রিপোর্ট");
+                    }
+
+                } else if (currentMode === 'upper_form') {
+                    drawJointLine(leftShoulder, rightShoulder, '#06b6d4');
                     
-                    // Velocity tracking for RPE
-                    let now = performance.now();
-                    let dt = (now - lastFrameTime) / 1000;
-                    if (dt > 0) {
-                        let speed = Math.abs(leftHip.y - lastPositionVal) / dt;
-                        repVelocities.push(speed);
-                        lastPositionVal = leftHip.y;
-                        lastFrameTime = now;
-                    }
-
-                    // Strict IPF Standard Squat State Machine
-                    if (movementState === 'STANDING' && kneeAngle < 155) {
-                        movementState = 'GOING_DOWN';
-                        minAngleInRep = kneeAngle;
-                    } else if (movementState === 'GOING_DOWN') {
-                        if (kneeAngle < minAngleInRep) {
-                            minAngleInRep = kneeAngle;
-                        }
-                        if (kneeAngle > minAngleInRep + 4) {
-                            movementState = 'GOING_UP';
-                        }
-                    } else if (movementState === 'GOING_UP' && kneeAngle > 160) {
-                        totalReps++;
-                        
-                        // Strict threshold (<= 105 degrees ensures true parallel/below parallel)
-                        if (minAngleInRep <= 105) {
-                            goodLifts++;
-                            addUniqueIssue(`✓ Rep ${totalReps}: সঠিক ডেপথ (${Math.round(minAngleInRep)}°) - Good Lift`);
-                        } else {
-                            noLifts++;
-                            addUniqueIssue(`❌ Rep ${totalReps}: ডেপথ কম হয়েছে (${Math.round(minAngleInRep)}°) - No Lift`);
-                        }
-                        movementState = 'STANDING';
-                        minAngleInRep = 180;
-                    }
-
-                    let estimatedRPE = calculateAccurateRPE();
-                    feedbackBox.innerText = `🏋️ স্কোয়াট | Reps: ${totalReps} | Good: ${goodLifts} | No Lift: ${noLifts} | RPE: ${estimatedRPE}`;
-                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-base font-semibold text-cyan-300 shadow-lg";
-
-                } else if (currentMode === 'bench') {
-                    drawJointLine(leftShoulder, leftElbow, '#06b6d4');
-                    drawJointLine(leftElbow, leftWrist, '#3b82f6');
-                    const elbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
-
-                    let now = performance.now();
-                    let dt = (now - lastFrameTime) / 1000;
-                    if (dt > 0) {
-                        let speed = Math.abs(leftWrist.y - lastPositionVal) / dt;
-                        repVelocities.push(speed);
-                        lastPositionVal = leftWrist.y;
-                        lastFrameTime = now;
-                    }
-
-                    if (movementState === 'STANDING' && elbowAngle < 150) {
-                        movementState = 'GOING_DOWN';
-                        minAngleInRep = elbowAngle;
-                    } else if (movementState === 'GOING_DOWN') {
-                        if (elbowAngle < minAngleInRep) minAngleInRep = elbowAngle;
-                        if (elbowAngle > minAngleInRep + 5) movementState = 'GOING_UP';
-                    } else if (movementState === 'GOING_UP' && elbowAngle > 155) {
-                        totalReps++;
-                        if (minAngleInRep <= 85) {
-                            goodLifts++;
-                            addUniqueIssue(`✓ Rep ${totalReps}: বুকে টাচ করেছে - Good Lift`);
-                        } else {
-                            noLifts++;
-                            addUniqueIssue(`❌ Rep ${totalReps}: বুক পর্যন্ত নামে নি - No Lift`);
-                        }
-                        movementState = 'STANDING';
-                        minAngleInRep = 180;
-                    }
-
-                    let estimatedRPE = calculateAccurateRPE();
-                    feedbackBox.innerText = `🦾 বেঞ্চ | Reps: ${totalReps} | Good: ${goodLifts} | No Lift: ${noLifts} | RPE: ${estimatedRPE}`;
-                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-base font-semibold text-cyan-300 shadow-lg";
-
-                } else if (currentMode === 'deadlift') {
-                    drawJointLine(leftShoulder, leftHip, '#06b6d4');
-                    drawJointLine(leftHip, leftKnee, '#3b82f6');
                     const spineLean = Math.abs(leftShoulder.x - leftHip.x);
-
-                    let now = performance.now();
-                    let dt = (now - lastFrameTime) / 1000;
-                    if (dt > 0) {
-                        let speed = Math.abs(leftHip.y - lastPositionVal) / dt;
-                        repVelocities.push(speed);
-                        lastPositionVal = leftHip.y;
-                        lastFrameTime = now;
+                    if (spineLean > 0.15) {
+                        addUniqueIssue("⚠️ উচ্চতা বা স্পাইনে অতিরিক্ত ল্যাটারাল ফ্লেকশন");
+                    } else {
+                        addUniqueIssue("✓ আপার বডি অ্যালাইনমেন্ট সঠিক রয়েছে");
                     }
 
-                    if (movementState === 'STANDING' && leftHip.y < 0.55) {
-                        movementState = 'GOING_DOWN';
-                    } else if (movementState === 'GOING_DOWN' && leftHip.y > 0.6) {
-                        movementState = 'GOING_UP';
-                    } else if (movementState === 'GOING_UP' && leftHip.y < 0.45) {
-                        totalReps++;
-                        if (spineLean <= 0.35) {
-                            goodLifts++;
-                            addUniqueIssue(`✓ Rep ${totalReps}: লকআউট ও স্পাইন সঠিক - Good Lift`);
-                        } else {
-                            noLifts++;
-                            addUniqueIssue(`❌ Rep ${totalReps}: পিঠ বাঁকা ছিল - No Lift`);
-                        }
-                        movementState = 'STANDING';
-                    }
+                    feedbackBox.innerText = `আপার বডি স্ক্যান চলছে...`;
+                    feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
 
-                    let estimatedRPE = calculateAccurateRPE();
-                    feedbackBox.innerText = `⚡ ডেডলিফ্ট | Reps: ${totalReps} | Good: ${goodLifts} | No Lift: ${noLifts} | RPE: ${estimatedRPE}`;
-                    feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-slate-800 border border-slate-700 rounded-xl text-center text-base font-semibold text-cyan-300 shadow-lg";
+                    if (scanFramesCount > 150) {
+                        finalizeScan("আপার বডি পোস্টার রিপোর্ট");
+                    }
                 }
             }
             canvasCtx.restore();
-        }
-
-        function calculateAccurateRPE() {
-            if (repVelocities.length < 5) return "7.5";
-            const recent = repVelocities.slice(-20);
-            const avgVel = recent.reduce((a, b) => a + b, 0) / recent.length;
-            
-            if (avgVel < 0.04) return "9.5 - 10 (সর্বোচ্চ প্রচেষ্টা / গ্রাইন্ড)";
-            if (avgVel < 0.09) return "9.0 (খুব ভারী)";
-            if (avgVel < 0.18) return "8.0 - 8.5 (দৃঢ় পেস)";
-            if (avgVel < 0.35) return "7.0 - 7.5 (মডারেট)";
-            return "6.0 - 6.5 (সহজ)";
         }
 
         function addUniqueIssue(issue) {
@@ -326,56 +188,34 @@
             }
         }
 
-        function finalizeLog(modeName) {
-            scanCompleted = true;
-            isLiveActive = false;
-            liveToggleBtn.innerHTML = "🟢 লাইভ ডিটেকশন শুরু করুন";
-            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2";
+        function finalizeScan(modeName) {
+            isScanning = false;
+            liveToggleBtn.innerHTML = "🟢 স্ক্যানিং শুরু করুন";
+            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
 
             let uniqueIssues = [...new Set(detectedIssues)];
             let problemsHTML = uniqueIssues.length === 0 
-                ? `<span class="text-emerald-400 font-semibold">✨ চমৎকার ফর্ম! কোনো নো-লিফট বা ভুল পাওয়া যায়নি।</span>`
-                : `<ul class="space-y-1">` + uniqueIssues.map(err => `<li class="text-sm ${err.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400'}">${err}</li>`).join('') + `</ul>`;
+                ? `<span class="text-emerald-400 font-semibold">✨ কোনো ত্রুটি পাওয়া যায়নি! পারফেক্ট।</span>`
+                : `<ul class="space-y-1">` + uniqueIssues.map(err => `<li class="text-xs ${err.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400'}">${err}</li>`).join('') + `</ul>`;
 
             const timestamp = new Date().toLocaleTimeString();
             
             logContent.innerHTML = `
-                <div class="bg-slate-900/90 p-4 rounded-xl border border-slate-700 mb-2 shadow-inner">
-                    <div class="flex justify-between font-bold text-cyan-300 text-base mb-1">
-                        <span>বিশ্লেষণ: ${modeName}</span>
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
+                    <div class="flex justify-between font-bold text-cyan-300 text-xs mb-1">
+                        <span>${modeName}</span>
                         <span class="text-emerald-400">সম্পন্ন</span>
                     </div>
-                    <div class="text-xs text-slate-400 mb-2">সময়: ${timestamp}</div>
-                    
-                    <div class="grid grid-cols-3 gap-2 mb-3 text-center">
-                        <div class="bg-slate-800 p-2 rounded-lg border border-slate-700">
-                            <div class="text-xs text-slate-400">মোট Reps</div>
-                            <div class="text-lg font-bold text-cyan-300">${totalReps}</div>
-                        </div>
-                        <div class="bg-emerald-950/60 p-2 rounded-lg border border-emerald-800">
-                            <div class="text-xs text-emerald-300">Good Lifts</div>
-                            <div class="text-lg font-bold text-emerald-400">${goodLifts}</div>
-                        </div>
-                        <div class="bg-rose-950/60 p-2 rounded-lg border border-rose-800">
-                            <div class="text-xs text-rose-300">No Lifts</div>
-                            <div class="text-lg font-bold text-rose-400">${noLifts}</div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3 p-2 bg-cyan-950/50 border border-cyan-800 rounded-lg text-cyan-200 font-semibold text-sm">
-                        🔥 ফাইনাল সেট RPE: <span class="text-amber-400">${calculateAccurateRPE()}</span>
-                    </div>
-                    <div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
-                        <div class="font-semibold text-cyan-400 mb-1 text-xs">জাজমেন্ট ও ভুলত্রুতির তালিকা:</div>
+                    <div class="text-[10px] text-slate-400 mb-2">সময়: ${timestamp}</div>
+                    <div class="bg-slate-800 p-2 rounded-lg border border-slate-700">
+                        <div class="font-semibold text-cyan-400 mb-1 text-[11px]">পর্যবেক্ষণ ও ফলাফল:</div>
                         ${problemsHTML}
                     </div>
                 </div>
             `;
             
-            feedbackBox.innerText = "বিশ্লেষণ সম্পন্ন! নিচের রিপোর্টে ১০০% নিখুঁত জাজমেন্ট দেখুন 🎯";
-            feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-lg font-semibold text-emerald-300 shadow-lg";
-            
-            customPlayBtn.style.display = 'flex';
+            feedbackBox.innerText = "স্ক্যান সম্পন্ন! নিচের রিপোর্টে ফলাফল দেখুন 🎯";
+            feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-sm font-semibold text-emerald-300 shadow-lg";
         }
 
         function drawJointLine(p1, p2, color) {
@@ -383,20 +223,8 @@
             canvasCtx.beginPath();
             canvasCtx.moveTo(p1.x * canvasElement.width, p1.y * canvasElement.height);
             canvasCtx.lineTo(p2.x * canvasElement.width, p2.y * canvasElement.height);
-            canvasCtx.lineWidth = 4;
-            canvasCtx.strokeStyle = color;
-            canvasCtx.stroke();
-        }
-
-        function drawBarPath() {
-            if (barPathPoints.length < 2) return;
-            canvasCtx.beginPath();
-            canvasCtx.moveTo(barPathPoints[0].x, barPathPoints[0].y);
-            for (let i = 1; i < barPathPoints.length; i++) {
-                canvasCtx.lineTo(barPathPoints[i].x, barPathPoints[i].y);
-            }
             canvasCtx.lineWidth = 3;
-            canvasCtx.strokeStyle = '#f59e0b';
+            canvasCtx.strokeStyle = color;
             canvasCtx.stroke();
         }
 
@@ -408,22 +236,22 @@
             modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
         });
 
         pose.onResults(onResults);
 
         async function runAnalyzerLoop() {
-            if (scanCompleted) return;
+            if (!isScanning) return;
 
-            if (!activeSource.paused && !activeSource.ended) {
-                if (!isSending && activeSource.readyState >= 2) {
+            if (!webcamElement.paused && !webcamElement.ended) {
+                if (!isSending && webcamElement.readyState >= 2) {
                     isSending = true;
                     try {
-                        await pose.send({ image: activeSource });
+                        await pose.send({ image: webcamElement });
                     } catch (err) {
-                        console.error("Pose send error:", err);
+                        console.error("Pose error:", err);
                     }
                     isSending = false;
                 }
@@ -433,12 +261,6 @@
 
         async function startCamera() {
             if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-            uploadedVideoElement.classList.add('hidden');
-            customPlayBtn.classList.add('hidden');
-            webcamElement.classList.remove('hidden');
-            
-            activeSource = webcamElement;
-            resetCounters();
 
             let constraints = {
                 video: {
@@ -452,8 +274,7 @@
                 currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (err) {
                 try {
-                    constraints = { video: { width: { ideal: 640 }, height: { ideal: 480 } } };
-                    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 } catch (e) {
                     feedbackBox.innerText = "ক্যামেরা অ্যাক্সেস পাওয়া যায়নি।";
                     return;
@@ -467,77 +288,17 @@
         }
 
         liveToggleBtn.addEventListener('click', () => {
-            if (activeSource !== webcamElement) return;
-
-            isLiveActive = !isLiveActive;
-            if (isLiveActive) {
-                scanCompleted = false;
-                resetCounters();
-                liveToggleBtn.innerHTML = "🛑 ডিটেকশন বন্ধ ও রেজাল্ট দেখুন";
-                liveToggleBtn.className = "w-full py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2";
-                feedbackBox.innerText = "লাইভ ডিটেকশন সচল! লিফট শুরু করুন... 🏋️‍♂️";
+            isScanning = !isScanning;
+            if (isScanning) {
+                scanFramesCount = 0;
+                detectedIssues = [];
+                liveToggleBtn.innerHTML = "🛑 স্ক্যান বন্ধ করুন";
+                liveToggleBtn.className = "w-full py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
                 runAnalyzerLoop();
             } else {
-                finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
+                finalizeScan("ম্যানুয়াল স্টপ");
             }
         });
-
-        videoUploadInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-
-            const videoUrl = URL.createObjectURL(file);
-            webcamElement.classList.add('hidden');
-            uploadedVideoElement.classList.remove('hidden');
-            customPlayBtn.classList.remove('hidden');
-
-            uploadedVideoElement.src = videoUrl;
-            uploadedVideoElement.load();
-            
-            activeSource = uploadedVideoElement;
-            resetCounters();
-            scanCompleted = false;
-
-            customPlayBtn.innerText = "▶";
-            feedbackBox.innerText = "ভিডিও আপলোড হয়েছে। প্লে বাটনে ক্লিক করুন 🎬";
-            feedbackBox.className = "mt-4 p-4 w-full max-w-2xl bg-blue-950/80 border border-blue-500 rounded-xl text-center text-lg font-semibold text-blue-300 shadow-lg";
-
-            uploadedVideoElement.onended = () => {
-                finalizeLog(modeSelect.options[modeSelect.selectedIndex].text);
-            };
-        });
-
-        customPlayBtn.addEventListener('click', () => {
-            if (uploadedVideoElement.paused) {
-                if (scanCompleted) {
-                    scanCompleted = false;
-                    resetCounters();
-                    uploadedVideoElement.currentTime = 0;
-                }
-                uploadedVideoElement.play();
-                customPlayBtn.style.display = 'none';
-                runAnalyzerLoop();
-            } else {
-                uploadedVideoElement.pause();
-                customPlayBtn.style.display = 'flex';
-                customPlayBtn.innerText = "▶";
-            }
-        });
-
-        function resetCounters() {
-            scanFramesCount = 0;
-            detectedIssues = [];
-            repVelocities = [];
-            barPathPoints = [];
-            totalReps = 0;
-            goodLifts = 0;
-            noLifts = 0;
-            movementState = 'STANDING';
-            minAngleInRep = 180;
-            lastFrameTime = performance.now();
-        }
 
         toggleCameraBtn.onclick = () => {
             useFrontCamera = !useFrontCamera;
@@ -545,28 +306,21 @@
         };
 
         resetLogBtn.addEventListener('click', () => {
-            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো লিফটের ডেটা রেকর্ড করা হয়নি।</p>`;
-            resetCounters();
-            scanCompleted = true;
-            isLiveActive = false;
-            liveToggleBtn.innerHTML = "🟢 লাইভ ডিটেকশন শুরু করুন";
-            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2";
-            
-            if(activeSource === webcamElement) {
-                feedbackBox.innerText = "রিসেট করা হয়েছে। লাইভ শুরু করতে বাটনে চাপ দিন।";
-            } else {
-                uploadedVideoElement.currentTime = 0;
-                uploadedVideoElement.pause();
-                customPlayBtn.style.display = 'flex';
-            }
+            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো স্ক্যান করা হয়নি।</p>`;
+            detectedIssues = [];
+            scanFramesCount = 0;
+            isScanning = false;
+            liveToggleBtn.innerHTML = "🟢 স্ক্যানিং শুরু করুন";
+            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
+            feedbackBox.innerText = "রিসেট করা হয়েছে। স্ক্যান শুরু করতে বাটনে চাপ দিন।";
         });
 
         modeSelect.addEventListener('change', () => {
-            resetCounters();
-            scanCompleted = true;
-            isLiveActive = false;
-            liveToggleBtn.innerHTML = "🟢 লাইভ ডিটেকশন শুরু করুন";
-            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2";
+            detectedIssues = [];
+            scanFramesCount = 0;
+            isScanning = false;
+            liveToggleBtn.innerHTML = "🟢 স্ক্যানিং শুরু করুন";
+            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
         });
 
         startCamera();
