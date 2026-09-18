@@ -566,12 +566,13 @@
                 videoElement.classList.remove('hidden');
 
                 camera = new Camera(videoElement, {
-                    onFrame: async () => {
-                        await pose.send({image: videoElement});
-                    },
-                    width: 640,
-                    height: 480
-                });
+    onFrame: async () => {
+        await pose.send({image: videoElement});
+    },
+    width: 640,
+    height: 480,
+    facingMode: 'environment' // Ekhane pechoner camera nirdesh kora holo
+});
                 camera.start().then(() => {
                     isCameraRunning = true;
                     btn.innerText = "Stop Camera";
