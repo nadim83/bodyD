@@ -547,46 +547,35 @@
     const file = event.target.files[0];
     if (!file) return;
     
-    // ক্যামেরা চালু থাকলে বন্ধ করে দেওয়া
     if (isCameraRunning) {
         stopCamera();
     }
 
     const imageUrl = URL.createObjectURL(file);
     
-    // ভিডিও ট্যাগ হাইড করে ইমেজ ট্যাগ ভিজিবল করা
     videoElement.classList.add('hidden');
     uploadedImageElem.classList.remove('hidden');
     
     document.getElementById('status-text').innerText = "Processing uploaded image...";
 
-    // ইমেজ প্রসেস করার ফাংশন
-    const processImage = async () => {
+    uploadedImageElem.src = imageUrl;
+
+    uploadedImageElem.onload = async () => {
         try {
-            if (uploadedImageElem.naturalWidth && uploadedImageElem.naturalHeight) {
-                canvasElement.width = uploadedImageElem.naturalWidth;
-                canvasElement.height = uploadedImageElem.naturalHeight;
-            } else {
-                canvasElement.width = 640;
-                canvasElement.height = 480;
-            }
+            canvasElement.width = uploadedImageElem.naturalWidth || 640;
+            canvasElement.height = uploadedImageElem.naturalHeight || 480;
             
+            // প্রথমে ক্যানভাসে নরমালি ইমেজটি ড্র করে রাখা যাতে গায়েব না হয়ে যায়
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(uploadedImageElem, 0, 0, canvasElement.width, canvasElement.height);
+
+            // এরপর MediaPipe পোজ ডিটেকশনের জন্য পাঠানো
             await pose.send({ image: uploadedImageElem });
         } catch (error) {
             console.error("Error processing image:", error);
-            document.getElementById('status-text').innerText = "Error processing image. Please try another file.";
+            document.getElementById('status-text').innerText = "Error processing image.";
         }
     };
-
-    // ইমেজ সোর্স সেট করা
-    uploadedImageElem.src = imageUrl;
-
-    // যদি ইমেজটি ইতিমধ্যে ক্যাশড বা লোড হয়ে থাকে
-    if (uploadedImageElem.complete) {
-        processImage();
-    } else {
-        uploadedImageElem.onload = processImage;
-    }
 }
 
         function toggleCamera() {
