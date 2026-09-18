@@ -562,18 +562,24 @@
 
     uploadedImageElem.onload = async () => {
         try {
-            canvasElement.width = uploadedImageElem.naturalWidth || 640;
-            canvasElement.height = uploadedImageElem.naturalHeight || 480;
+            // ইমেজের আসল ডাইমেনশন ক্যানভাসে সেট করা
+            const imgWidth = uploadedImageElem.naturalWidth || 640;
+            const imgHeight = uploadedImageElem.naturalHeight || 480;
             
-            // প্রথমে ক্যানভাসে নরমালি ইমেজটি ড্র করে রাখা যাতে গায়েব না হয়ে যায়
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(uploadedImageElem, 0, 0, canvasElement.width, canvasElement.height);
+            canvasElement.width = imgWidth;
+            canvasElement.height = imgHeight;
 
-            // এরপর MediaPipe পোজ ডিটেকশনের জন্য পাঠানো
+            // ক্যানভাসে ছবিটি আগে থেকে ড্র করে পিক্সেল ফিক্সড করে নেওয়া
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(uploadedImageElem, 0, 0, imgWidth, imgHeight);
+
+            // MediaPipe-এর জন্য ইমেজ এলিমেন্ট সরাসরি পাঠানো
             await pose.send({ image: uploadedImageElem });
+            
+            document.getElementById('status-text').innerText = "Image processed successfully.";
         } catch (error) {
             console.error("Error processing image:", error);
-            document.getElementById('status-text').innerText = "Error processing image.";
+            document.getElementById('status-text').innerText = "Error processing image. Try another file.";
         }
     };
 }
