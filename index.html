@@ -562,18 +562,18 @@
 
     uploadedImageElem.onload = async () => {
         try {
-            // ইমেজের আসল ডাইমেনশন ক্যানভাসে সেট করা
             const imgWidth = uploadedImageElem.naturalWidth || 640;
             const imgHeight = uploadedImageElem.naturalHeight || 480;
             
+            // ক্যানভাসের সাইজ সেট করা
             canvasElement.width = imgWidth;
             canvasElement.height = imgHeight;
 
-            // ক্যানভাসে ছবিটি আগে থেকে ড্র করে পিক্সেল ফিক্সড করে নেওয়া
+            // অত্যন্ত গুরুত্বপূর্ণ: MediaPipe পোজ পাঠানোর আগেই ক্যানভাসে ছবিটি পার্মানেন্টলি ড্র করে নেওয়া
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(uploadedImageElem, 0, 0, imgWidth, imgHeight);
 
-            // MediaPipe-এর জন্য ইমেজ এলিমেন্ট সরাসরি পাঠানো
+            // এরপর পোজ ডিটেকশনের জন্য পাঠানো
             await pose.send({ image: uploadedImageElem });
             
             document.getElementById('status-text').innerText = "Image processed successfully.";
@@ -583,7 +583,6 @@
         }
     };
 }
-
         function toggleCamera() {
             const btn = document.getElementById('startBtn');
             if (!isCameraRunning) {
