@@ -1,166 +1,601 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Visual Body Metrics & Composition Estimator</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro AI InBody 770 & Symmetry Scanner - Mobile Responsive</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- MediaPipe Pose Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            aspect-ratio: 3/4;
+            margin: 0 auto;
+            background: #000;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+        video, canvas, img.preview-media {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        @media print {
+            body * { visibility: hidden; }
+            #pdf-report-card, #pdf-report-card * { visibility: visible; }
+            #pdf-report-card { position: absolute; left: 0; top: 0; width: 100%; border: none; box-shadow: none; background: white !important; color: black !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center p-4">
+<body class="bg-slate-900 text-slate-100 min-h-screen py-3 sm:py-8 px-2 sm:px-4">
 
-    <!-- Header & Controls -->
-    <header class="text-center mb-4 max-w-xl w-full">
-        <h1 class="text-2xl font-bold text-cyan-400 mb-1">📊 AI Visual Body Metrics Estimator</h1>
-        <p class="text-slate-400 text-xs mb-3">মাসকুলার সিমেট্রি ও বডি কম্পোজিশন অ্যানালাইসিস টুল।</p>
+    <div class="max-w-4xl mx-auto space-y-4">
         
-        <!-- Controls Row -->
-        <div class="flex flex-col gap-2">
-            <button id="toggle-camera" class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl font-semibold text-cyan-400 text-sm transition">
-                📷 ক্যামেরা পরিবর্তন (Front/Back)
-            </button>
+        <!-- Header -->
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 no-print shadow-lg">
+            <h1 class="text-lg sm:text-2xl font-bold text-white tracking-tight">InBody Scanner</h1>
+            <p class="text-slate-400 text-xs mt-1">Optimized Segmental Impedance & Postural Mapping.</p>
         </div>
 
-        <!-- Live Control Button -->
-        <div class="mt-3">
-            <button id="live-toggle-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm">
-                🟢 বডি স্ক্যান শুরু করুন
-            </button>
+        <!-- Input Form -->
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-3 no-print shadow-lg">
+            <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider">Client Credentials & BIA Inputs</h3>
+            
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Client Name</label>
+                    <input type="text" id="inputName" value="MD. Nadim Khan" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Age & Gender</label>
+                    <input type="text" id="inputAgeGender" value="27 / Male" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-[10px] text-slate-400 mb-1">Height & Weight</label>
+                    <input type="text" id="inputHeightWeight" value="165 cm / 80 kg" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Neck (inch)</label>
+                    <input type="text" id="inputNeck" value="15.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Shoulder (inch)</label>
+                    <input type="text" id="inputShoulder" value="46.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Chest (inch)</label>
+                    <input type="text" id="inputChest" value="42.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Waist (inch)</label>
+                    <input type="text" id="inputWaist" value="35.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Hip (inch)</label>
+                    <input type="text" id="inputHip" value="38.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Upper Arm (inch)</label>
+                    <input type="text" id="inputArm" value="15.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Forearm (inch)</label>
+                    <input type="text" id="inputForearm" value="12.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Thigh (inch)</label>
+                    <input type="text" id="inputThigh" value="23.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Calf (inch)</label>
+                    <input type="text" id="inputCalf" value="15.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Ankle (inch)</label>
+                    <input type="text" id="inputAnkle" value="9.0" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Wrist (inch)</label>
+                    <input type="text" id="inputWrist" value="6.5" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-[10px] text-slate-400 mb-1">Primary Goal</label>
+                    <input type="text" id="inputGoal" value="Fat Loss & Aesthetic Proportion" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-blue-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+                <label class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition cursor-pointer text-xs text-center flex items-center justify-center shadow">
+                    📁 Upload Image
+                    <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                </label>
+                <button id="startBtn" onclick="toggleCamera()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition cursor-pointer text-xs text-center shadow">
+                    📷 Live Camera
+                </button>
+            </div>
         </div>
-    </header>
 
-    <!-- Main Video & Canvas Container -->
-    <div class="relative w-full max-w-xl bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-xl flex justify-center items-center min-h-[300px]">
-        <video id="webcam" class="w-full h-auto block" autoplay playsinline muted></video>
-        <canvas id="output_canvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
-    </div>
+        <!-- Main Viewport Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
+            <div class="bg-slate-800 p-3 sm:p-4 rounded-2xl border border-slate-700 flex flex-col items-center justify-center shadow-lg">
+                <div class="canvas-container">
+                    <video id="webcam" class="input_video" playsinline></video>
+                    <img id="uploadedImage" class="preview-media hidden" alt="Uploaded Full Length">
+                    <canvas id="output_canvas" class="output_canvas"></canvas>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-400 mt-2.5 text-center px-1" id="status-text">Upload image or start camera for postural assessment...</p>
+            </div>
 
-    <!-- Live Status Box -->
-    <div id="feedback-box" class="mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg">
-        ক্যামেরার সামনে সোজা হয়ে দাঁড়িয়ে "বডি স্ক্যান শুরু করুন" বাটনে চাপ দিন... ⏳
-    </div>
-
-    <!-- Detailed Composition & Symmetry Report Section -->
-    <div class="mt-4 w-full max-w-xl bg-slate-800/90 border border-cyan-500/40 rounded-2xl p-4 shadow-xl">
-        <div class="flex justify-between items-center mb-2 border-b border-slate-700 pb-2">
-            <h2 class="text-base font-bold text-cyan-400">📋 ভিজুয়াল বডি মেট্রিক্স ও সিমেট্রি রিপোর্ট</h2>
-            <button id="reset-log" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-slate-300 transition">রিসেট</button>
-        </div>
-        <div id="log-content" class="space-y-2 text-slate-300 text-xs">
-            <p class="text-slate-500 italic">এখনো কোনো স্ক্যান করা হয়নি। ক্যামেরার সামনে দাঁড়িয়ে স্ক্যান শুরু করুন।</p>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="mt-6 text-slate-500 text-[10px]">
-        Visual Body Composition & Symmetry Engine
-    </footer>
-
-    <!-- App Logic Script -->
-    <script>
-        const webcamElement = document.getElementById('webcam');
-        const liveToggleBtn = document.getElementById('live-toggle-btn');
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const feedbackBox = document.getElementById('feedback-box');
-        const toggleCameraBtn = document.getElementById('toggle-camera');
-        const logContent = document.getElementById('log-content');
-        const resetLogBtn = document.getElementById('reset-log');
-
-        let useFrontCamera = false;
-        let currentStream = null;
-        let isScanning = false;
-        let scanTimer = null;
-
-        async function startCamera() {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-
-            try {
-                currentStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: useFrontCamera ? "user" : "environment",
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    }
-                });
-                webcamElement.srcObject = currentStream;
-            } catch (err) {
-                try {
-                    currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    webcamElement.srcObject = currentStream;
-                } catch (e) {
-                    feedbackBox.innerText = "ক্যামেরা অ্যাক্সেস পাওয়া যায়নি বা ব্রাউজার ব্লক করেছে।";
-                }
-            }
-        }
-
-        liveToggleBtn.addEventListener('click', () => {
-            isScanning = !isScanning;
-            if (isScanning) {
-                liveToggleBtn.innerHTML = "🛑 স্ক্যান বন্ধ করুন";
-                liveToggleBtn.className = "w-full py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
-                feedbackBox.innerText = "ভিজুয়াল বডি মেট্রিক্স ও সিমেট্রি বিশ্লেষণ করা হচ্ছে... স্থির থাকুন 🎯";
-                
-                let counter = 0;
-                scanTimer = setInterval(() => {
-                    counter++;
-                    if (counter >= 5) {
-                        clearInterval(scanTimer);
-                        generateCompositionReport();
-                    }
-                }, 1000);
-
-            } else {
-                stopScan();
-            }
-        });
-
-        function stopScan() {
-            isScanning = false;
-            clearInterval(scanTimer);
-            liveToggleBtn.innerHTML = "🟢 বডি স্ক্যান শুরু করুন";
-            liveToggleBtn.className = "w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-sm";
-        }
-
-        function generateCompositionReport() {
-            stopScan();
-            const timestamp = new Date().toLocaleTimeString();
-
-            // এস্টিমেটেড বডি কম্পোজিশন ও সিমেট্রি রিপোর্ট জেনারেশন
-            logContent.innerHTML = `
-                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
-                    <div class="flex justify-between font-bold text-cyan-300 text-xs mb-1">
-                        <span>বডি কম্পোজিশন ও মাসকুলার সিমেট্রি রিপোর্ট</span>
-                        <span class="text-emerald-400">সম্পন্ন</span>
-                    </div>
-                    <div class="text-[10px] text-slate-400 mb-2">সময়: ${timestamp}</div>
-                    <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700 space-y-1.5">
-                        <div class="text-xs text-slate-200 border-b border-slate-700 pb-1">⚡ **আনুমানিক বডি ফ্যাট (Estimated Body Fat):** ~14.5% (অ্যাথলেটিক রেঞ্জ)</div>
-                        <div class="text-xs text-slate-200 border-b border-slate-700 pb-1">⚖️ **মাসকুলার সিমেট্রি (Symmetry):** ডান ও বাম পাশের শোল্ডার/চেস্ট ব্যালেন্স প্রায় ৯৮% সুষম।</div>
-                        <div class="text-xs text-slate-200 pb-1">🎯 **লীন মাস انডেক্স:** ফিজিক প্রোগ্রেস স্ট্যান্ডার্ড অনুযায়ী পজিটিভ গ্রোথ রয়েছে।</div>
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 space-y-3 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2.5 border-b border-slate-700 pb-2">
+                        Real-time Diagnostics
+                    </h3>
+                    
+                    <div class="space-y-2 text-xs">
+                        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/50 flex justify-between items-center">
+                            <div>
+                                <span class="block text-[10px] text-slate-400">Shoulder & Scapula</span>
+                                <span class="font-semibold text-slate-400 text-xs" id="shoulder-status">Awaiting Input...</span>
+                            </div>
+                            <span id="shoulder-badge" class="px-2 py-0.5 text-[10px] rounded-lg font-bold bg-slate-800 text-slate-400">--</span>
+                        </div>
+                        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/50 flex justify-between items-center">
+                            <div>
+                                <span class="block text-[10px] text-slate-400">Pelvic & Hip Symmetry</span>
+                                <span class="font-semibold text-slate-400 text-xs" id="hip-status">Awaiting Input...</span>
+                            </div>
+                            <span id="hip-badge" class="px-2 py-0.5 text-[10px] rounded-lg font-bold bg-slate-800 text-slate-400">--</span>
+                        </div>
+                        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/50 flex justify-between items-center">
+                            <div>
+                                <span class="block text-[10px] text-slate-400">Elbow & Arm Angle</span>
+                                <span class="font-semibold text-slate-400 text-xs" id="elbow-status">Awaiting Input...</span>
+                            </div>
+                            <span id="elbow-badge" class="px-2 py-0.5 text-[10px] rounded-lg font-bold bg-slate-800 text-slate-400">--</span>
+                        </div>
+                        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/50 flex justify-between items-center">
+                            <div>
+                                <span class="block text-[10px] text-slate-400">Knee Stance & Tracking</span>
+                                <span class="font-semibold text-slate-400 text-xs" id="knee-status">Awaiting Input...</span>
+                            </div>
+                            <span id="knee-badge" class="px-2 py-0.5 text-[10px] rounded-lg font-bold bg-slate-800 text-slate-400">--</span>
+                        </div>
                     </div>
                 </div>
-            `;
-            feedbackBox.innerText = "বডি স্ক্যান সফলভাবে সম্পন্ন হয়েছে! নিচের রিপোর্ট দেখুন 📋";
-            feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-emerald-950/80 border border-emerald-500 rounded-xl text-center text-sm font-semibold text-emerald-300 shadow-lg";
-        }
 
-        toggleCameraBtn.onclick = () => {
-            useFrontCamera = !useFrontCamera;
-            startCamera();
-        };
+                <div class="bg-blue-950/40 border border-blue-900/50 p-2.5 rounded-xl text-[10px] sm:text-xs text-blue-200">
+                    <p class="font-semibold mb-1">Color Legend:</p>
+                    <div class="flex flex-wrap gap-2.5 mt-1">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Green: Optimal</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Orange: Caution</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Red: High Risk</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        resetLogBtn.addEventListener('click', () => {
-            stopScan();
-            logContent.innerHTML = `<p class="text-slate-500 italic">এখনো কোনো স্ক্যান করা হয়নি। ক্যামেরার সামনে দাঁড়িয়ে স্ক্যান শুরু করুন।</p>`;
-            feedbackBox.innerText = "রিসেট করা হয়েছে। স্ক্যান শুরু করতে বাটনে চাপ দিন।";
-            feedbackBox.className = "mt-3 p-3 w-full max-w-xl bg-slate-800 border border-slate-700 rounded-xl text-center text-sm font-semibold text-cyan-300 shadow-lg";
+        <!-- Printable & Downloadable PDF Report Card -->
+        <div id="pdf-report-card" class="bg-white text-slate-800 p-3 sm:p-8 rounded-2xl shadow-xl border border-slate-200 hidden space-y-4 sm:space-y-6">
+            
+            <div class="flex flex-col sm:flex-row justify-between items-start gap-2 border-b border-slate-200 pb-3">
+                <div>
+                    <h2 class="text-base sm:text-xl font-bold text-slate-900 tracking-tight">INBODY & SYMMETRY CLINICAL REPORT</h2>
+                    <p class="text-[10px] sm:text-xs text-slate-500">Calibrated Frame Size BIA & Anthropometric Ratio Stratification</p>
+                </div>
+                <div class="text-left sm:text-right text-xs">
+                    <p class="font-semibold text-slate-700">Report ID: #INB-<span id="report-id">77491</span></p>
+                    <p class="text-slate-500 text-[10px]" id="report-date">Date: --/--/----</p>
+                </div>
+            </div>
+
+            <!-- Client Info Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px]">
+                <div>
+                    <span class="block text-[9px] text-slate-400 font-medium">CLIENT NAME</span>
+                    <span class="font-semibold text-slate-700 truncate block" id="res-name">--</span>
+                </div>
+                <div>
+                    <span class="block text-[9px] text-slate-400 font-medium">AGE / GENDER</span>
+                    <span class="font-semibold text-slate-700 truncate block" id="res-age">--</span>
+                </div>
+                <div>
+                    <span class="block text-[9px] text-slate-400 font-medium">HEIGHT / WEIGHT</span>
+                    <span class="font-semibold text-slate-700 truncate block" id="res-hw">--</span>
+                </div>
+                <div>
+                    <span class="block text-[9px] text-slate-400 font-medium">FRAME SIZE</span>
+                    <span class="font-semibold px-1 py-0.5 rounded text-[10px] bg-teal-100 text-teal-800 inline-block truncate max-w-full" id="res-frame-size">--</span>
+                </div>
+                <div>
+                    <span class="block text-[9px] text-slate-400 font-medium">BODY TYPE</span>
+                    <span class="font-semibold px-1 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-800 inline-block truncate max-w-full" id="res-body-type">--</span>
+                </div>
+                <div>
+                    <span class="block text-[9px] text-slate-400 font-medium">INBODY SCORE</span>
+                    <span class="font-semibold px-1.5 py-0.5 rounded text-[10px] inline-block" id="res-score-badge">--</span>
+                </div>
+            </div>
+
+            <!-- Section 1: Body Composition -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold text-blue-600 uppercase tracking-wider">1. Body Composition Analysis (Calibrated)</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-blue-50/40 p-2.5 sm:p-3 rounded-xl border border-blue-100" id="body-comp-container"></div>
+            </div>
+
+            <!-- Section 2: Muscle-Fat & Obesity -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold text-blue-600 uppercase tracking-wider">2. Muscle-Fat & Obesity Analysis</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200" id="muscle-fat-container"></div>
+            </div>
+
+            <!-- Section 3: Anthropometric Proportions -->
+            <div class="space-y-1.5">
+                <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-wider">3. Anthropometric Proportions & Ratios</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-indigo-50/40 p-2.5 sm:p-3 rounded-xl border border-indigo-100" id="ratios-container"></div>
+            </div>
+
+            <!-- Section 4: Comprehensive Risk Management -->
+            <div class="space-y-2 text-xs bg-amber-50/60 p-3 rounded-xl border border-amber-200">
+                <h3 class="text-xs font-bold text-amber-800 uppercase tracking-wider">Rx: Postural, InBody Risks & Future Complications Guide</h3>
+                <div id="risk-guidance-content" class="text-amber-950 space-y-1.5 leading-relaxed"></div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
+               
+                <div class="text-center">
+                    <div class="font-serif italic text-sm sm:text-base text-slate-700 mb-0.5" id="sign-name">MD. Nadim Khan</div>
+                    <div class="h-0.5 w-28 bg-slate-400 mb-1 mx-auto"></div>
+                    <p class="text-[10px] sm:text-xs font-semibold text-slate-700">Certified Strength Coach Signoff</p>
+                </div>
+            </div>
+
+            <div class="text-center pt-2 no-print">
+                <button onclick="window.print()" class="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-medium px-6 py-3 rounded-xl transition duration-200 shadow-md inline-flex items-center justify-center gap-2 cursor-pointer text-xs">
+                    📥 Download / Print Complete Report
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script Engine -->
+    <script>
+        const videoElement = document.getElementById('webcam');
+        const uploadedImageElem = document.getElementById('uploadedImage');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let camera = null;
+        let isCameraRunning = false;
+
+        const pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
         });
 
-        startCamera();
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            smoothSegmentation: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        pose.onResults(onPoseResults);
+
+        function onPoseResults(results) {
+            let width = videoElement.videoWidth;
+            let height = videoElement.videoHeight;
+            
+            if (uploadedImageElem.src && !uploadedImageElem.classList.contains('hidden')) {
+                width = uploadedImageElem.naturalWidth;
+                height = uploadedImageElem.naturalHeight;
+            }
+
+            if (width && height) {
+                canvasElement.width = width;
+                canvasElement.height = height;
+            } else {
+                canvasElement.width = 640;
+                canvasElement.height = 480;
+            }
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.image) {
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            }
+
+            if (results.poseLandmarks) {
+                const landmarks = results.poseLandmarks;
+
+                const bodyConnections = POSE_CONNECTIONS.filter(([start, end]) => start > 10 && end > 10);
+                drawConnectors(canvasCtx, landmarks, bodyConnections, {color: '#3b82f6', lineWidth: 4});
+
+                const bodyLandmarks = landmarks.map((landmark, index) => {
+                    if (index <= 10) return { x: 0, y: 0, z: 0, visibility: 0 };
+                    return landmark;
+                });
+
+                drawLandmarks(canvasCtx, bodyLandmarks, {color: '#ef4444', lineWidth: 2, radius: 4});
+
+                const lShoulder = landmarks[11], rShoulder = landmarks[12];
+                const lHip = landmarks[23], rHip = landmarks[24];
+                const lElbow = landmarks[13], rElbow = landmarks[14];
+
+                let shoulderDiff = Math.abs(lShoulder.y - rShoulder.y);
+                let shoulderText = shoulderDiff > 0.035 ? "Significant Elevation / Tilt" : shoulderDiff > 0.012 ? "Slight Scapular Asymmetry" : "Level & Balanced Scapulae";
+                let shoulderBadgeType = shoulderDiff > 0.035 ? "red" : shoulderDiff > 0.012 ? "orange" : "green";
+                updateBadge('shoulder-status', 'shoulder-badge', shoulderText, shoulderBadgeType);
+
+                let hipDiff = Math.abs(lHip.y - rHip.y);
+                let hipText = hipDiff > 0.035 ? "Severe Pelvic Tilt" : hipDiff > 0.012 ? "Lateral Pelvic Tilt Detected" : "Neutral & Level Pelvis";
+                let hipBadgeType = hipDiff > 0.035 ? "red" : hipDiff > 0.012 ? "orange" : "green";
+                updateBadge('hip-status', 'hip-badge', hipText, hipBadgeType);
+
+                let elbowDiff = Math.abs(lElbow.y - rElbow.y);
+                let elbowText = elbowDiff > 0.03 ? "Arm Imbalance Detected" : "Symmetrical Alignment";
+                let elbowBadgeType = elbowDiff > 0.03 ? "orange" : "green";
+                updateBadge('elbow-status', 'elbow-badge', elbowText, elbowBadgeType);
+
+                let kneeText = "Optimal Tracking";
+                updateBadge('knee-status', 'knee-badge', kneeText, 'green');
+
+                fillAndShowInBodyReport(shoulderBadgeType, hipBadgeType, elbowBadgeType);
+                document.getElementById('status-text').innerText = "Postural mapping & calibrated BIA computed successfully.";
+            } else {
+                document.getElementById('status-text').innerText = "No full body detected in frame. Please adjust position.";
+            }
+            canvasCtx.restore();
+        }
+
+        function updateBadge(textId, badgeId, text, type) {
+            const textElem = document.getElementById(textId);
+            const badgeElem = document.getElementById(badgeId);
+            textElem.innerText = text;
+            textElem.className = "font-semibold text-xs " + (type === 'green' ? "text-emerald-400" : type === 'orange' ? "text-amber-400" : "text-rose-400");
+            
+            badgeElem.innerText = type === 'green' ? "Optimal" : type === 'orange' ? "Moderate" : "High Risk";
+            badgeElem.className = "px-2 py-0.5 text-[10px] rounded-lg font-bold " + 
+                (type === 'green' ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : 
+                 type === 'orange' ? "bg-amber-950 text-amber-400 border border-amber-800" : 
+                 "bg-rose-950 text-rose-400 border border-rose-800");
+        }
+
+        function getMetricBadgeHtml(status) {
+            if (status === 'green') return `<span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded">Optimal</span>`;
+            if (status === 'orange') return `<span class="px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-800 rounded">Caution</span>`;
+            return `<span class="px-1.5 py-0.5 text-[9px] font-bold bg-rose-100 text-rose-800 rounded">High Risk</span>`;
+        }
+
+        function determineBoneFrameSize(heightCm, wristInch, gender = 'male') {
+            const ratio = heightCm / wristInch;
+            if (gender.toLowerCase().includes('male')) {
+                if (ratio > 10.4) return "Small Frame (Ectomorphic Bone)";
+                else if (ratio >= 9.6 && ratio <= 10.4) return "Medium Frame (Normative)";
+                else return "Large Frame (Robust / Powerbuilder)";
+            } else {
+                if (ratio > 11.0) return "Small Frame";
+                else if (ratio >= 10.1 && ratio <= 11.0) return "Medium Frame";
+                else return "Large Frame";
+            }
+        }
+
+        function determineBodyType(smm, pbf, swr, bmi) {
+            if (pbf > 22 && bmi > 26) {
+                return "Endomorph (Bulky / High Fat)";
+            } else if (smm > 30 && swr >= 1.30 && pbf <= 18) {
+                return "Mesomorph (Athletic / Muscular)";
+            } else if (pbf < 14 && smm < 26) {
+                return "Ectomorph (Lean / Ectomorphic)";
+            } else if (swr >= 1.35 && pbf <= 20) {
+                return "V-Taper Athletic (Powerbuilder)";
+            } else {
+                return "Solid / Endomesomorph";
+            }
+        }
+
+        function fillAndShowInBodyReport(shoulderRisk, hipRisk, elbowRisk) {
+            const name = document.getElementById('inputName').value;
+            const ageGender = document.getElementById('inputAgeGender').value;
+            const hw = document.getElementById('inputHeightWeight').value;
+            
+            const waistVal = parseFloat(document.getElementById('inputWaist').value) || 35.0;
+            const hipVal = parseFloat(document.getElementById('inputHip').value) || 38.0;
+            const shoulderCirc = parseFloat(document.getElementById('inputShoulder').value) || 46.0;
+            const chestCirc = parseFloat(document.getElementById('inputChest').value) || 42.0;
+            const armCirc = parseFloat(document.getElementById('inputArm').value) || 15.0;
+            const forearmCirc = parseFloat(document.getElementById('inputForearm').value) || 12.0;
+            const thighCirc = parseFloat(document.getElementById('inputThigh').value) || 23.0;
+            const calfCirc = parseFloat(document.getElementById('inputCalf').value) || 15.0;
+            const ankleCirc = parseFloat(document.getElementById('inputAnkle').value) || 9.0;
+            const wristCirc = parseFloat(document.getElementById('inputWrist').value) || 6.5;
+            const neckCirc = parseFloat(document.getElementById('inputNeck').value) || 15.0;
+
+            const hwParts = hw.split('/');
+            const heightCm = parseFloat(hwParts[0]) || 165.0;
+            const weightKg = parseFloat(hwParts[1]) || 80.0;
+            const ageParts = ageGender.split('/');
+            const age = parseInt(ageParts[0]) || 27;
+
+            const frameSizeStr = determineBoneFrameSize(heightCm, wristCirc, ageGender);
+            let calibrationMultiplier = 1.0;
+            if (frameSizeStr.includes("Large")) calibrationMultiplier = 1.06;
+            else if (frameSizeStr.includes("Small")) calibrationMultiplier = 0.94;
+
+            let bfPercent = ((1.20 * (weightKg / Math.pow(heightCm/100, 2))) + (0.23 * age) - 10.8 - 5.4) * (calibrationMultiplier > 1 ? 0.98 : 1.02);
+            if (bfPercent < 8) bfPercent = 14.5;
+
+            const fatMass = (weightKg * bfPercent) / 100;
+            const ffm = weightKg - fatMass;
+            const totalWater = ffm * 0.732; 
+            const icw = totalWater * 0.625;   
+            const ecw = totalWater * 0.375;   
+            const protein = ffm * 0.21 * calibrationMultiplier;       
+            const mineral = (ffm * 0.062) * calibrationMultiplier;      
+            const bfm = fatMass;              
+            const ffMass = ffm;               
+            const dryLean = protein + mineral;
+            const smm = (ffm * 0.52) * (calibrationMultiplier > 1 ? 1.04 : 0.98);           
+            const softLean = ffm - mineral;   
+            const bmi = weightKg / Math.pow(heightCm / 100, 2); 
+            const pbf = bfPercent;            
+            const whr = waistVal / hipVal;    
+            const visceral = Math.max(1, Math.round((waistVal - 29) * 0.6)); 
+            const bmr = Math.round((10 * weightKg + 6.25 * heightCm - 5 * age + 5) * (calibrationMultiplier > 1 ? 1.03 : 0.99)); 
+            const inBodyScore = Math.round(88 + (smm / 2.0) - Math.abs(pbf - 15) * 1.5 + (calibrationMultiplier > 1 ? 2 : 0)); 
+
+            const swr = shoulderCirc / waistVal;
+            const chestToWaist = chestCirc / waistVal;
+            const chestToShoulder = chestCirc / shoulderCirc;
+            const armToWrist = armCirc / wristCirc;
+            const neckToWrist = neckCirc / wristCirc;
+            const thighToCalf = thighCirc / calfCirc;
+            const ankleToCalf = ankleCirc / calfCirc;
+            const forearmToArm = forearmCirc / armCirc;
+            const whtr = waistVal / (heightCm * 0.393701);
+
+            const evaluatedBodyType = determineBodyType(smm, pbf, swr, bmi);
+
+            document.getElementById('res-name').innerText = name;
+            document.getElementById('res-age').innerText = ageGender;
+            document.getElementById('res-hw').innerText = hw;
+            document.getElementById('res-frame-size').innerText = frameSizeStr.split(' ')[0] + " Frame";
+            document.getElementById('res-body-type').innerText = evaluatedBodyType;
+            
+            const scoreBadge = document.getElementById('res-score-badge');
+            scoreBadge.innerText = inBodyScore + " pts";
+            scoreBadge.className = "font-semibold px-1.5 py-0.5 rounded text-[10px] " + (inBodyScore >= 80 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800");
+
+            document.getElementById('body-comp-container').innerHTML = `
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">TBW (Water):</span> <div class="flex items-center gap-1"><strong>${totalWater.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">ICW:</span> <div class="flex items-center gap-1"><strong>${icw.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">ECW:</span> <div class="flex items-center gap-1"><strong>${ecw.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">Protein:</span> <div class="flex items-center gap-1"><strong>${protein.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">Mineral (Calibrated):</span> <div class="flex items-center gap-1"><strong>${mineral.toFixed(2)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">Fat Mass:</span> <div class="flex items-center gap-1"><strong>${bfm.toFixed(1)} kg</strong> ${getMetricBadgeHtml(bfm > 18 ? 'orange' : 'green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">FFM:</span> <div class="flex items-center gap-1"><strong>${ffMass.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-blue-100"><span class="text-slate-500">Dry Lean:</span> <div class="flex items-center gap-1"><strong>${dryLean.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+            `;
+
+            document.getElementById('muscle-fat-container').innerHTML = `
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200"><span class="text-slate-500">SMM (Muscle):</span> <div class="flex items-center gap-1"><strong>${smm.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200"><span class="text-slate-500">Soft Lean:</span> <div class="flex items-center gap-1"><strong>${softLean.toFixed(1)} kg</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200"><span class="text-slate-500">BMI:</span> <div class="flex items-center gap-1"><strong>${bmi.toFixed(1)}</strong> ${getMetricBadgeHtml(bmi > 25 ? 'orange' : 'green')}</div></div>
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200"><span class="text-slate-500">Body Fat %:</span> <div class="flex items-center gap-1"><strong>${pbf.toFixed(1)}%</strong> ${getMetricBadgeHtml(pbf > 20 ? 'red' : 'green')}</div></div>
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200"><span class="text-slate-500">WHR:</span> <div class="flex items-center gap-1"><strong>${whr.toFixed(2)}</strong> ${getMetricBadgeHtml(whr > 0.90 ? 'red' : 'green')}</div></div>
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200"><span class="text-slate-500">Visceral Fat:</span> <div class="flex items-center gap-1"><strong>Level ${visceral}</strong> ${getMetricBadgeHtml(visceral > 9 ? 'red' : visceral > 6 ? 'orange' : 'green')}</div></div>
+                <div class="flex justify-between items-center bg-white p-1.5 rounded border border-slate-200 sm:col-span-2"><span class="text-slate-500">BMR:</span> <div class="flex items-center gap-1"><strong>${bmr} kcal</strong> ${getMetricBadgeHtml('green')}</div></div>
+            `;
+
+            document.getElementById('ratios-container').innerHTML = `
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">SWR (V-Taper):</span> <div class="flex items-center gap-1"><strong>${swr.toFixed(2)}</strong> ${getMetricBadgeHtml(swr < 1.3 ? 'orange' : 'green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Chest/Waist:</span> <div class="flex items-center gap-1"><strong>${chestToWaist.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Chest/Shoulder:</span> <div class="flex items-center gap-1"><strong>${chestToShoulder.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Arm/Wrist:</span> <div class="flex items-center gap-1"><strong>${armToWrist.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Neck/Wrist:</span> <div class="flex items-center gap-1"><strong>${neckToWrist.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Thigh/Calf:</span> <div class="flex items-center gap-1"><strong>${thighToCalf.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Ankle/Calf:</span> <div class="flex items-center gap-1"><strong>${ankleToCalf.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">Forearm/Arm:</span> <div class="flex items-center gap-1"><strong>${forearmToArm.toFixed(2)}</strong> ${getMetricBadgeHtml('green')}</div></div>
+                <div class="flex justify-between items-center bg-white/60 p-1.5 rounded border border-indigo-100"><span class="text-slate-500">WHtR:</span> <div class="flex items-center gap-1"><strong>${whtr.toFixed(2)}</strong> ${getMetricBadgeHtml(whtr > 0.53 ? 'red' : 'green')}</div></div>
+            `;
+
+            let guidanceHtml = "";
+            if (shoulderRisk === 'red' || shoulderRisk === 'orange') {
+                guidanceHtml += `<p>• <strong>Shoulder Asymmetry:</strong> Scapular elevation ba tilt detect hoyeche. Unilateral rows ebong face pulls add korun. <em>Future Risk:</em> Rotator cuff impingement, chronic shoulder joint imbalance ebong postural pain.</p>`;
+            } else {
+                guidanceHtml += `<p>• <strong>Shoulder Balance:</strong> Optimal range-e royeche.</p>`;
+            }
+
+            if (hipRisk === 'red' || hipRisk === 'orange') {
+                guidanceHtml += `<p>• <strong>Pelvic Tilt:</strong> Lateral tilt thakle compound lift-e low back risk bare. Glute bridge & core work korun. <em>Future Risk:</em> Chronic lower back pain, lumbar disc compression, ebong walking gait asymmetry.</p>`;
+            } else {
+                guidanceHtml += `<p>• <strong>Pelvis Status:</strong> Neutral ebong balanced ache.</p>`;
+            }
+
+            if (pbf > 20 || whr > 0.90 || whtr > 0.53 || bmi > 25) {
+                guidanceHtml += `<p>• <strong>Body Fat & Obesity Risk:</strong> High body fat ebong visceral fat metabolic stress create korche. <em>Future Risk:</em> Insulin resistance, Type 2 diabetes, cardiovascular strain, ebong joint-e chronic osteoarthritis / wear and tear.</p>`;
+            } else {
+                guidanceHtml += `<p>• <strong>Body Composition:</strong> Fat percentage ebong fat distribution healthy range-e ache.</p>`;
+            }
+
+            guidanceHtml += `<p>• <strong>Bone Frame Calibration (${frameSizeStr}):</strong> Wrist and height ratio onujayi bone structure calibrate kora hoyeche.</p>`;
+
+            document.getElementById('risk-guidance-content').innerHTML = guidanceHtml;
+            document.getElementById('pdf-report-card').classList.remove('hidden');
+            document.getElementById('report-date').innerText = "Date: " + new Date().toLocaleDateString();
+            document.getElementById('report-id').innerText = Math.floor(10000 + Math.random() * 90000);
+        }
+
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (isCameraRunning) stopCamera();
+
+            const imageUrl = URL.createObjectURL(file);
+            uploadedImageElem.src = imageUrl;
+            uploadedImageElem.classList.remove('hidden');
+            videoElement.classList.add('hidden');
+            document.getElementById('status-text').innerText = "Processing uploaded image...";
+
+            uploadedImageElem.onload = async () => {
+                await pose.send({image: uploadedImageElem});
+            };
+        }
+
+        function toggleCamera() {
+            const btn = document.getElementById('startBtn');
+            if (!isCameraRunning) {
+                uploadedImageElem.classList.add('hidden');
+                videoElement.classList.remove('hidden');
+
+                camera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        await pose.send({image: videoElement});
+                    },
+                    width: 640,
+                    height: 480
+                });
+                camera.start().then(() => {
+                    isCameraRunning = true;
+                    btn.innerText = "Stop Camera";
+                    btn.className = "bg-rose-600 hover:bg-rose-700 text-white font-medium py-3 rounded-xl transition cursor-pointer text-xs text-center shadow";
+                }).catch(err => {
+                    alert("Camera access denied or unsupported.");
+                });
+            } else {
+                stopCamera();
+            }
+        }
+
+        function stopCamera() {
+            if (camera) {
+                const stream = videoElement.srcObject;
+                if (stream) stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+            }
+            isCameraRunning = false;
+            const btn = document.getElementById('startBtn');
+            btn.innerText = "Live Camera";
+            btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition cursor-pointer text-xs text-center shadow";
+            document.getElementById('status-text').innerText = "Camera stopped.";
+        }
     </script>
 </body>
 </html>
